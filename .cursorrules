@@ -1,0 +1,43 @@
+# Portfolio Net Worth Tracker — Cursor Rules
+
+## Project overview
+
+Single-user personal app to track net worth, expenses, budgets, and portfolio performance. Data comes from:
+- **Plaid** — banks and credit cards (transactions, balances, categories). Use for expense tracking and budgets.
+- **Snaptrade** — brokerage (Fidelity only; no Coinbase) for positions and portfolio value. Nightly cron fetches Snaptrade and writes **daily** portfolio snapshots; we keep daily for **current month + previous month** only, then roll that month to **monthly** and delete its daily rows (e.g. in April: daily for March + April, monthly for January and February).
+
+Stack: **Supabase** (Postgres + Auth) + **Vercel** (hosting + cron at 11pm) + **Go backend** + **React frontend** in same repo (`backend/`, `frontend/`), one deploy with Go serving the React build.
+
+- **Single user only** — no multi-tenant logic; one login, one set of connections.
+- **Plaid** — **webhooks + single nightly cron**. Webhooks primary: on `SYNC_UPDATES_AVAILABLE`, call `/transactions/sync` (cursor-based) and upsert. Nightly cron is a **safety check**: run cursor-based sync to ensure cursor is at the very end of the book (no missed transactions).
+- **Cron** — one nightly job at 11pm: (1) Plaid cursor safety check (sync to end); (2) Snaptrade fetch + write **daily_snapshots** and **daily_holdings** for today; (3) at month-end write **monthly_snapshots** and **monthly_holdings** for that month. After a month ends, retention job deletes that month’s daily rows and keeps only its monthly value.
+- **Plaid item rotation** — Development tier: maintain ~5 items; when an item hits call limit, call `/item/remove` and re-link same institution to get a fresh item. Historical data keyed by institution/account so re-link keeps history.
+- **Link management** — List Plaid items and Snaptrade connections; show red alert when status is broken (e.g. `ITEM_LOGIN_REQUIRED`); support reconnect (Plaid Link update or Snaptrade Connect).
+
+Core tables: 
+- `plaid_items`: item_id, access_token (encrypted/supabase vault), institution_id, institution_name, status, last_updated
+- `plaid_accounts`: id, account_id, type, subtype, current_balance
+- `snaptrade_connections`: id, brokerages/connection metadata, status, last_synced
+- `transactions`: id, plaid_account_id, plaid_transaction_id, date, amount, name, merchant_name, category
+- `budgets`: month, allocations (category_id -> amount)
+- `daily_snapshots`: date, net_worth_cents, portfolio_value_cents, cash_cents, liabilities_cents (keep current + previous month only; then roll to monthly)
+- `daily_holdings`: date, account_id, symbol, quantity, value_cents (same retention)
+- `monthly_snapshots`: month, net_worth_cents, portfolio_value_cents, cash_cents, liabilities_cents
+- `monthly_holdings`: month, account_id, symbol, value_cents
+- `categories`: id, name, plaid_category (if mapping), expense
+
+Never log or commit `access_token` or API secrets; use env only.
+
+---
+
+## Code standards: clean and maintainable
+
+- **Naming** — Use clear, consistent names. Prefer `getTransactionsForMonth`, `plaidItemId`, `netWorthCents`. Avoid abbreviations unless universal (`id`, `url`).
+- **Small, single-purpose functions** — One function does one thing. Extract helpers for categorization, net-worth calculation, and snapshot building so they are testable and reusable.
+- **Types** — Define types/interfaces for all API responses, DB rows, and props. No `any` for domain data. Use shared types (e.g. `lib/types`) for Plaid/Snaptrade DTOs and app models.
+- **API and DB** — Keep API routes thin: validate auth, call service/lib functions, return JSON. Put business logic (categorization, snapshot aggregation) in `lib/` or `services/`, not inside route handlers. Use Supabase RLS so the DB enforces access; still validate session in API.
+- **Secrets** — Never commit `.env`, `.env.local`, or any file containing Plaid/Snaptrade/Supabase secrets. Use env vars only; document required vars in README or a `.env.example` (no values).
+- **Errors** — Handle errors explicitly. Log meaningfully (no PII). Return clear, safe messages to the client; avoid leaking stack or internal details.
+- **Tests** — Prefer unit tests for categorization, net-worth math, and snapshot logic (mocked Plaid/Snaptrade). Keep tests readable and stable; avoid flaky time-dependent or external calls in core tests, integration tests for API calls?
+- **Structure** — Prefer `app/` for routes and layouts, `components/` for UI, `lib/` for Supabase client, Plaid/Snaptrade clients, and shared logic. Keep `app/api/` routes organized by concern (e.g. `api/webhooks/plaid`, `api/cron/daily-sync`, `api/plaid/exchange-token`).
+- **Refactors** — When adding a feature, leave the codebase easier to understand than before. Extract repeated logic; name new concepts clearly; update types and call sites together.
