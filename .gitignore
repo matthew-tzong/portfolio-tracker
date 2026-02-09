@@ -1,1 +1,14 @@
+node_modules
+dist
+.DS_Store
+.env
+.env.*
+backend/.env
+backend/bin
+backend/tmp
+frontend/.vite
+frontend/.env
+frontend/.env.*
+*.log
 .cursor/plans
+CURRENT_STATE.md
