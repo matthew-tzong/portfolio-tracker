@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
 	"github.com/golang-jwt/jwt/v5"
 )
 
@@ -14,10 +15,11 @@ type contextKey string
 const userIDContextKey contextKey = "userID"
 
 // JWTAuth is middleware that validates a Supabase JWT (HS256) from the Authorization header.
-// It expects: Authorization: Bearer <access_token>  and extracts the user ID (sub claim) from the token.
-// It adds the request context with the user ID, if the token is valid it calls the next handler, else returns 401.
+// It expects: Authorization: Bearer <access_token> and extracts the user ID (sub claim) from the token.
+// It adds the request context with the user ID; if the token is valid it calls the next handler, else returns 401.
 func JWTAuth(next http.Handler) http.Handler {
 	secret := os.Getenv("SUPABASE_JWT_SECRET")
+	allowedEmail := os.Getenv("ALLOWED_USER_EMAIL")
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenString, err := extractBearerToken(r.Header.Get("Authorization"))
@@ -37,7 +39,7 @@ func JWTAuth(next http.Handler) http.Handler {
 		// parse the token
 		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
 			// Supabase JWTs are signed with HS256 by default
-			_, ok := t.Method.(*jwt.SigningMethodHMAC); 
+			_, ok := t.Method.(*jwt.SigningMethodHMAC)
 			if !ok {
 				return nil, errors.New("unexpected signing method")
 			}
@@ -60,6 +62,13 @@ func JWTAuth(next http.Handler) http.Handler {
 		sub, _ := claims["sub"].(string)
 		if sub == "" {
 			http.Error(w, "missing subject", http.StatusUnauthorized)
+			return
+		}
+
+		// Enforce that this token belongs to the single allowed user.
+		email, _ := claims["email"].(string)
+		if email == "" || !strings.EqualFold(email, allowedEmail) {
+			http.Error(w, "unauthorized user", http.StatusUnauthorized)
 			return
 		}
 

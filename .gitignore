@@ -12,3 +12,4 @@ frontend/.env.*
 *.log
 .cursor/plans
 CURRENT_STATE.md
+SUPABASE_SETUP.md

@@ -1,5 +1,7 @@
 # Portfolio Tracker — TODO (Vertical Slices)
 
+**Single-user only.** This app is for one owner. No multi-user or multi-tenant features.
+
 **Stack:** Go backend (`backend/`) + React frontend (`frontend/`), Supabase (DB + Auth), Vercel (host React and/or cron that calls Go). Same repo; Go serves React for one deploy.
 
 Each slice is a **vertical slice**: a complete end-to-end piece of value you can run and verify, from UI to API to data. Order is chosen so early slices give a usable app quickly.
@@ -8,25 +10,24 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 ## Slice 1: Repo, app shell, and auth
 
-**Goal:** One repo with Go backend and React frontend; you can sign in (Supabase) and only you can access the app.
+**Goal:** One repo with Go backend and React frontend; you can sign in (Supabase) and only you can access the app (single Supabase user, no public sign-up).
 
-- [ ] **1.1 Repo and stack**
-  - [ ] Monorepo: `backend/` (Go module), `frontend/` (React — Vite or CRA, TypeScript).
-  - [ ] Backend: Go HTTP server (e.g. Chi or Echo), CORS for frontend origin. Frontend: ESLint + Prettier.
-  - [ ] `.gitignore`: `node_modules`, `.env`, `.env.local`, `backend/.env`, binaries, logs. No `.env*` with secrets.
-  - [ ] `.env.example` (root or both): list `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` (for Go), and later Plaid/Snaptrade. No values.
-- [ ] **1.2 Supabase**
-  - [ ] Create Supabase project; get URL, anon key, and JWT secret (for Go to verify tokens).
-  - [ ] Enable Auth (email/password or one social provider).
-  - [ ] Frontend: add `@supabase/supabase-js`; create client in `frontend/src/lib/supabase.ts` (or similar).
-- [ ] **1.3 Auth UI and protection (React)**
-  - [ ] Sign-in / sign-up page; wire to Supabase Auth.
-  - [ ] Protected layout: redirect unauthenticated users to sign-in; after sign-in, show minimal dashboard placeholder.
-  - [ ] React app sends Supabase JWT (e.g. in `Authorization: Bearer <access_token>`) to Go API for protected routes.
-- [ ] **1.4 Go API: JWT validation**
-  - [ ] Middleware or helper in Go: verify Supabase JWT (using `SUPABASE_JWT_SECRET`), extract `sub` (user id). Reject requests without valid token. Use for all protected endpoints.
-- [ ] **1.5 RLS scaffolding**
-  - [ ] Supabase: initial schema (e.g. `users` or profile keyed by `auth.uid()`); enable RLS so only that user can read/write. Go writes via service role or anon key with user context as needed.
+- [x] **1.1 Repo and stack**
+  - [x] Monorepo: `backend/` (Go module), `frontend/` (React — Vite or CRA, TypeScript).
+  - [x] Backend: Go HTTP server (e.g. Chi or Echo), CORS for frontend origin. Frontend: ESLint + Prettier.
+  - [x] `.gitignore`: `node_modules`, `.env`, `.env.local`, `backend/.env`, binaries, logs. No `.env*` with secrets.
+  - [x] `.env.example` (root or both): list `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` (for Go), and later Plaid/Snaptrade. No values.
+- [x] **1.2 Supabase**
+  - [x] Create Supabase project; get URL, anon key, and JWT secret (for Go to verify tokens).
+  - [x] Enable Auth (email/password provider); disable public sign-ups.
+  - [x] Create a single Supabase user (you) and record their email for backend locking.
+  - [x] Frontend: add `@supabase/supabase-js`; create client in `frontend/src/lib/supabase.ts` (or similar).
+- [x] **1.3 Auth UI and protection (React)**
+  - [x] Sign-in page (no public sign-up); wire to Supabase Auth.
+  - [x] Protected layout: redirect unauthenticated users to sign-in; after sign-in, show minimal dashboard placeholder.
+  - [x] React app sends Supabase JWT (e.g. in `Authorization: Bearer <access_token>`) to Go API for protected routes.
+- [x] **1.4 Go API: JWT validation**
+  - [x] Middleware or helper in Go: verify Supabase JWT (using `SUPABASE_JWT_SECRET`), extract `sub` (user id), and enforce `ALLOWED_USER_EMAIL` for single-user access. Reject requests without valid token. Use for all protected endpoints.
 
 **Done when:** You can run backend and frontend locally, sign in in the React app, and see a protected dashboard; unauthenticated users cannot access it; Go API rejects requests without a valid Supabase JWT.
 

@@ -8,13 +8,17 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
  - If no active session, throws an error and redirects to the auth page.
  */
 export async function apiRequest<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const {data: { session }} = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
   if (!session) {
     throw new Error('Not authenticated')
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {...options, headers: {
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...options,
+    headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${session.access_token}`,
       ...options?.headers,

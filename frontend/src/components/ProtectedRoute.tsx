@@ -17,7 +17,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
     // Initialize the session status
     const initializeSession = async () => {
-      const {data: { session }} = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       if (!isMounted) {
         return
       }
@@ -25,7 +27,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     }
 
     initializeSession()
-    const {data: { subscription }} = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) {
         return
       }
@@ -53,4 +57,3 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   return <>{children}</>
 }
-
