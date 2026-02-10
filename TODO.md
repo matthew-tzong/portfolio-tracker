@@ -16,7 +16,6 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
   - [x] Monorepo: `backend/` (Go module), `frontend/` (React — Vite or CRA, TypeScript).
   - [x] Backend: Go HTTP server (e.g. Chi or Echo), CORS for frontend origin. Frontend: ESLint + Prettier.
   - [x] `.gitignore`: `node_modules`, `.env`, `.env.local`, `backend/.env`, binaries, logs. No `.env*` with secrets.
-  - [x] `.env.example` (root or both): list `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_JWT_SECRET` (for Go), and later Plaid/Snaptrade. No values.
 - [x] **1.2 Supabase**
   - [x] Create Supabase project; get URL, anon key, and JWT secret (for Go to verify tokens).
   - [x] Enable Auth (email/password provider); disable public sign-ups.
@@ -27,7 +26,7 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
   - [x] Protected layout: redirect unauthenticated users to sign-in; after sign-in, show minimal dashboard placeholder.
   - [x] React app sends Supabase JWT (e.g. in `Authorization: Bearer <access_token>`) to Go API for protected routes.
 - [x] **1.4 Go API: JWT validation**
-  - [x] Middleware or helper in Go: verify Supabase JWT (using `SUPABASE_JWT_SECRET`), extract `sub` (user id), and enforce `ALLOWED_USER_EMAIL` for single-user access. Reject requests without valid token. Use for all protected endpoints.
+  - [x] Middleware or helper in Go: verify Supabase JWT (ES256) via JWKS discovery from `SUPABASE_URL`, extract `sub` (user id), and enforce `ALLOWED_USER_EMAIL` for single-user access. Reject requests without valid token. Use for all protected endpoints.
 
 **Done when:** You can run backend and frontend locally, sign in in the React app, and see a protected dashboard; unauthenticated users cannot access it; Go API rejects requests without a valid Supabase JWT.
 

@@ -2,7 +2,12 @@ package serverauth
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"math/big"
 	"net/http"
 	"os"
 	"strings"
@@ -14,12 +19,13 @@ type contextKey string
 
 const userIDContextKey contextKey = "userID"
 
-// JWTAuth is middleware that validates a Supabase JWT (HS256) from the Authorization header.
+// JWTAuth is middleware that validates a Supabase JWT (ES256) from the Authorization header.
+// It uses Supabase's JWKS discovery URL to fetch the public key and validate the token.
 // It expects: Authorization: Bearer <access_token> and extracts the user ID (sub claim) from the token.
 // It adds the request context with the user ID; if the token is valid it calls the next handler, else returns 401.
 func JWTAuth(next http.Handler) http.Handler {
-	secret := os.Getenv("SUPABASE_JWT_SECRET")
-	allowedEmail := os.Getenv("ALLOWED_USER_EMAIL")
+	supabaseURL := strings.TrimSuffix(os.Getenv("SUPABASE_URL"), "/")
+	allowedUserEmail := os.Getenv("ALLOWED_USER_EMAIL")
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenString, err := extractBearerToken(r.Header.Get("Authorization"))
@@ -30,21 +36,27 @@ func JWTAuth(next http.Handler) http.Handler {
 			return
 		}
 
-		// if the secret is not set, return 500
-		if secret == "" {
+		// Ensure required configuration is present.
+		if supabaseURL == "" || allowedUserEmail == "" {
 			http.Error(w, "server auth not configured", http.StatusInternalServerError)
 			return
 		}
 
-		// parse the token
+		jwksURL := supabaseURL + "/auth/v1/.well-known/jwks.json"
+
+		// Parse and validate the token using an ES256 key from JWKS.
 		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-			// Supabase JWTs are signed with HS256 by default
-			_, ok := t.Method.(*jwt.SigningMethodHMAC)
-			if !ok {
-				return nil, errors.New("unexpected signing method")
+			if t.Method.Alg() != jwt.SigningMethodES256.Alg() {
+				return nil, errors.New("unexpected signing method, expected ES256")
 			}
-			return []byte(secret), nil
+			keyID, _ := t.Header["kid"].(string)
+			publicKey, err := fetchES256KeyFromJWKS(jwksURL, keyID)
+			if err != nil {
+				return nil, err
+			}
+			return publicKey, nil
 		})
+
 		// if the token is invalid, return 401
 		if err != nil || !token.Valid {
 			http.Error(w, "invalid token", http.StatusUnauthorized)
@@ -67,7 +79,7 @@ func JWTAuth(next http.Handler) http.Handler {
 
 		// Enforce that this token belongs to the single allowed user.
 		email, _ := claims["email"].(string)
-		if email == "" || !strings.EqualFold(email, allowedEmail) {
+		if email == "" || !strings.EqualFold(email, allowedUserEmail) {
 			http.Error(w, "unauthorized user", http.StatusUnauthorized)
 			return
 		}
@@ -76,6 +88,59 @@ func JWTAuth(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), userIDContextKey, sub)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// Fetches JWKS and returns the ES256 public key matching the given keyID
+func fetchES256KeyFromJWKS(jwksURL string, keyID string) (*ecdsa.PublicKey, error) {
+	resp, err := http.Get(jwksURL)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.New("failed to fetch JWKS")
+	}
+
+	var jwks struct {
+		Keys []struct {
+			KeyID   string `json:"kid"`
+			KeyType string `json:"kty"`
+			Curve   string `json:"crv"`
+			XCoord  string `json:"x"`
+			YCoord  string `json:"y"`
+		} `json:"keys"`
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&jwks)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, key := range jwks.Keys {
+		if key.KeyType != "EC" || key.Curve != "P-256" {
+			continue
+		}
+		if keyID != "" && key.KeyID != keyID {
+			continue
+		}
+
+		xBytes, err := base64.RawURLEncoding.DecodeString(key.XCoord)
+		if err != nil {
+			continue
+		}
+		yBytes, err := base64.RawURLEncoding.DecodeString(key.YCoord)
+		if err != nil {
+			continue
+		}
+
+		x := new(big.Int).SetBytes(xBytes)
+		y := new(big.Int).SetBytes(yBytes)
+
+		return &ecdsa.PublicKey{Curve: elliptic.P256(), X: x, Y: y}, nil
+	}
+
+	return nil, errors.New("no suitable ES256 key found in JWKS")
 }
 
 // UserIDFromContext returns the authenticated user's ID from the request context.
@@ -98,4 +163,5 @@ func extractBearerToken(header string) (string, error) {
 	}
 	return strings.TrimSpace(parts[1]), nil
 }
+
 

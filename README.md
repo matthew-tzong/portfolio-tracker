@@ -40,12 +40,10 @@
    - Create **one** user in **Auth → Users** (this is you)
 
 3. **Configure environment variables**:
-   - Copy `.env.example` to `backend/.env` and `frontend/.env`
-   - In `backend/.env`, set:
+   - Create a `backend/.env` file and set:
      - `SUPABASE_URL`
-     - `SUPABASE_JWT_SECRET`
      - `ALLOWED_USER_EMAIL` (the email of the single Supabase user you created)
-   - In `frontend/.env`, set:
+   - Create a `frontend/.env` file and set:
      - `VITE_SUPABASE_URL`
      - `VITE_SUPABASE_ANON_KEY`
      - `VITE_API_URL` (usually `http://localhost:8080` for local dev)
@@ -85,7 +83,7 @@
 
 ## Environment Variables
 
-See `.env.example` for all required variables. Never commit `.env` files.
+Create `backend/.env` and `frontend/.env` as described above. Never commit `.env` files.
 
 ## License
 

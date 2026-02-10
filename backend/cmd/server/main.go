@@ -7,9 +7,9 @@ import (
 )
 
 func main() {
-	if err := server.Run() {
+	err := server.Run()
+	if err != nil {
 		log.Printf("server error: %v", err)
 		os.Exit(1)
 	}
-	log.Println("server started")
 }

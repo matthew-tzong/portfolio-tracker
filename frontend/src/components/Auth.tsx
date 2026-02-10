@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useNavigate } from 'react-router-dom'
 
 // Authentication screen (sign-in only), UI never exposes public sign-up form.
 export function Auth() {
@@ -7,6 +8,7 @@ export function Auth() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   // Sign-in handler for the auth form.
   const handleSubmit = async (e: React.FormEvent) => {
@@ -19,6 +21,7 @@ export function Auth() {
       if (error) {
         throw error
       }
+      navigate('/dashboard', { replace: true })
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Authentication failed')
     } finally {
