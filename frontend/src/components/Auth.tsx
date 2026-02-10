@@ -1,0 +1,97 @@
+import { useState } from 'react'
+import { supabase } from '../lib/supabase'
+
+  // Authentication screen
+export function Auth() {
+  const [isSignUp, setIsSignUp] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Sign Up/Sign In handler for the auth form.
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setError(null)
+
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({email, password})
+        if (error) {
+          throw error
+        }
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({email, password})
+        if (error) {
+          throw error
+        }
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Authentication failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="max-w-md mx-auto mt-12 px-5">
+      <h1 className="text-2xl font-semibold text-gray-900">
+        {isSignUp ? 'Create your account' : 'Sign in to your portfolio'}
+      </h1>
+      <p className="text-gray-500 text-sm mt-1 mb-5">
+        Your Personal Portfolio Tracker
+      </p>
+      <form onSubmit={handleSubmit}>
+        <div className="mb-4">
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+            Email
+          </label>
+          <input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full px-3 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        <div className="mb-4">
+          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full px-3 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        {error && (
+          <div className="text-red-600 text-sm mb-4">{error}</div>
+        )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full py-2.5 px-4 text-base font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? 'Loading...' : isSignUp ? 'Create account' : 'Sign in'}
+        </button>
+      </form>
+      <div className="mt-4 text-center">
+        <button
+          type="button"
+          onClick={() => {
+            setIsSignUp(!isSignUp)
+            setError(null)
+          }}
+          className="text-blue-600 hover:underline text-sm"
+        >
+          {isSignUp ? 'Sign in' : 'Create account'}
+        </button>
+      </div>
+    </div>
+  )
+}
