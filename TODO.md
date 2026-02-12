@@ -36,22 +36,17 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 **Goal:** You can add and list connections (Plaid and Snaptrade), see their status, and have a path to reconnect when broken.
 
-- [ ] **2.1 Plaid Link — connect**
-  - [ ] **Go**: endpoint to create Plaid link token (e.g. `GET /api/plaid/link-token`); endpoint to exchange public token and store item (`POST /api/plaid/exchange-token`). Use Plaid Go SDK; store in `plaid_items` and `plaid_accounts` in Supabase (via Go). Never log `access_token`.
-  - [ ] **React**: embed Plaid Link; get link token from Go API; on success send public token to Go; redirect to connections/dashboard.
-- [ ] **2.2 Snaptrade Connect**
-  - [ ] **Go**: endpoints to create Snaptrade user/session and register callback; store connection in `snaptrade_connections` after Connect completes.
-  - [ ] **React**: open Snaptrade Connect (URL from Go); after redirect, call Go to persist connection and show success.
-- [ ] **2.3 Link management page (React)**
-  - [ ] Page listing all Plaid items and Snaptrade connections. Data from Go API (which reads DB and optionally refreshes status from Plaid/Snaptrade).
-  - [ ] **Go**: endpoint(s) to list items/connections and their status (e.g. Plaid item get for status). Return “OK” vs “Reconnect needed” (e.g. `ITEM_LOGIN_REQUIRED`).
-- [ ] **2.4 Red alert and reconnect**
-  - [ ] React: when status is broken, show red alert and “Reconnect” button.
-  - [ ] Reconnect: Plaid = Link update or delete item (Go: `POST /api/plaid/remove-item`) + new Link; Snaptrade = open Connect again; Go updates stored connection.
-- [ ] **2.5 Plaid item rotation (optional in this slice)**
-  - [ ] Go: endpoint to remove item (`/item/remove`); React “Re-link” flow: call remove then open Link for same institution; Go saves new item. Keep transactions/accounts keyed by institution/account so re-link preserves history.
+- [x] **2.1 Plaid Link — connect**
+  - [x] **Go**: endpoint to create Plaid link token (`GET /api/plaid/link-token`); endpoint to exchange public token and store item (`POST /api/plaid/exchange-token`). Uses a minimal custom Plaid HTTP client (`internal/plaid/client.go`) and stores data in `plaid_items` and `plaid_accounts` in Supabase (via Go). Never logs `access_token`.
+  - [x] **React**: embed Plaid Link via the browser script; get link token from Go API; on success send public token (plus institution metadata) to Go; show success banner on the dashboard.
+- [x] **2.2 Snaptrade Connect**
+  - [x] **Go**: endpoints to create/ensure a Snaptrade user and generate a connection portal URL (`POST /api/snaptrade/connect-url`); endpoint to sync connections into `snaptrade_connections` (`POST /api/snaptrade/sync-connections`) using the official SnapTrade Go SDK wrapper.
+  - [x] **React**: `SnaptradeConnectSection` opens the Snaptrade Connect portal (URL from Go) in a new tab; after opening, a dashboard callback triggers a sync and shows a success banner.
+- [x] **2.3 Link management page (React)**
+  - [x] Page listing all Plaid items and Snaptrade connections at `/links`. Data from Go API (`GET /api/links`), which reads from Supabase only.
+  - [x] **Go**: endpoint to list items/connections and their basic status (currently a simple `"OK"` string for Snaptrade; more detailed reconnect states can be added later).
 
-**Done when:** You can link a bank/CC (Plaid) and Fidelity (Snaptrade) via React, see them on a link management page (data from Go API), and reconnect when status is broken.
+**Done when:** You can link a bank/CC (Plaid) and a brokerage via Snaptrade in React, see them on a link management page (data from Go API), and remove/sync connections.
 
 ---
 
@@ -66,6 +61,11 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
   - [ ] Compute net worth = cash + investment value − liabilities. Put logic in `backend/internal/` or `backend/pkg/`; use from API handler.
 - [ ] **3.3 Dashboard UI (React)**
   - [ ] Page or section: fetch accounts and net worth from Go API; list accounts (name, type, balance, mask); display net worth (single number or breakdown: cash, investments, liabilities).
+- [ ] **3.4 Red alert and reconnect (Plaid + Snaptrade)**
+  - [ ] React: when status is broken, show red alert and “Reconnect” button on the connections/dashboard UI.
+  - [ ] Reconnect: Plaid = Link update or delete item (Go: `POST /api/plaid/remove-item`) + new Link; Snaptrade = open Connect again; Go updates stored connection.
+- [ ] **3.5 Plaid item rotation (optional)**
+  - [ ] Go: endpoint to remove item (`/item/remove`); React “Re-link” flow: call remove then open Link for the same institution; Go saves new item. Keep transactions/accounts keyed by institution/account so re-link preserves history.
 
 **Done when:** After linking, you see all accounts and one net worth number from the Go API when you load or refresh the dashboard.
 

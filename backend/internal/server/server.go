@@ -5,13 +5,41 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/internal/plaid"
 	"github.com/matthewtzong/portfolio-tracker/backend/internal/serverauth"
+	"github.com/matthewtzong/portfolio-tracker/backend/internal/snaptrade"
 )
 
-// Run configures and starts the HTTP server with CORS support and protected routes.
-// It sets up a health check endpoint and protected API routes that require JWT authentication.
+// Configures and starts the HTTP server with CORS support and protected routes.
 func Run() error {
 	mux := http.NewServeMux()
+
+	// Initialize Supabase database client
+	var dbClient *database.Client
+	if client, err := database.NewClientFromEnv(); err != nil {
+		log.Printf("supabase database client not configured: %v", err)
+	} else {
+		dbClient = client
+		log.Println("supabase database client initialized")
+	}
+
+	// Initialize Plaid client
+	var plaidClient *plaid.Client
+	if client, err := plaid.NewClientFromEnv(); err != nil {
+		log.Printf("plaid client not configured: %v", err)
+	} else {
+		plaidClient = client
+	}
+
+	// Initialize Snaptrade client
+	var snaptradeClient *snaptrade.Client
+	if client, err := snaptrade.NewClientFromEnv(); err != nil {
+		log.Printf("snaptrade client not configured: %v", err)
+	} else {
+		snaptradeClient = client
+	}
 
 	// Health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -25,6 +53,13 @@ func Run() error {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"message":"pong (protected)"}`))
 	})))
+
+	// Registers the link management routes.
+	registerLinkManagementRoutes(mux, apiDependencies{
+		db:              dbClient,
+		plaidClient:     plaidClient,
+		snaptradeClient: snaptradeClient,
+	})
 
 	handler := withCORS(mux)
 
@@ -41,8 +76,7 @@ func Run() error {
 	return server.ListenAndServe()
 }
 
-// withCORS adds CORS headers to responses, allowing the frontend origin to make requests.
-// It handles OPTIONS preflight requests and sets appropriate CORS headers for all other requests.
+// Adds CORS headers to responses, allowing the frontend origin to make requests.
 func withCORS(next http.Handler) http.Handler {
 	allowedOrigin := getEnv("CORS_ALLOWED_ORIGIN", "http://localhost:5173")
 
@@ -62,13 +96,11 @@ func withCORS(next http.Handler) http.Handler {
 	})
 }
 
-
-// getEnv retrieves an environment variable value, returning the fallback if not set.
+// Retrieves an environment variable value, returning the fallback if not set.
 func getEnv(key, fallback string) string {
-	envValue := os.Getenv(key); 
+	envValue := os.Getenv(key)
 	if envValue != "" {
 		return envValue
 	}
 	return fallback
 }
-

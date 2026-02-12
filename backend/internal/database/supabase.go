@@ -1,0 +1,383 @@
+package database
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+	"strings"
+	"time"
+)
+
+// Supabase client for database operations.
+type Client struct {
+	httpClient *http.Client
+	baseURL    string
+	apiKey     string
+}
+
+// Creates a Supabase client from environment variables.
+func NewClientFromEnv() (*Client, error) {
+	url := strings.TrimSuffix(os.Getenv("SUPABASE_URL"), "/")
+	apiKey := os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
+
+	if url == "" || apiKey == "" {
+		return nil, errors.New("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set")
+	}
+
+	return &Client{
+		httpClient: &http.Client{Timeout: 15 * time.Second},
+		baseURL:    url,
+		apiKey:     apiKey,
+	}, nil
+}
+
+// Returns the PostgREST URL for a table.
+func (c *Client) restURL(table string) string {
+	return c.baseURL + "/rest/v1/" + table
+}
+
+// Executes an HTTP request with Supabase auth headers.
+func (c *Client) doRequest(ctx context.Context, method, url string, body interface{}) (*http.Response, error) {
+	// If there is a body, marshal it into a JSON reader.
+	var bodyReader io.Reader
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return nil, err
+		}
+		bodyReader = bytes.NewReader(data)
+	}
+
+	// Creates a new request with the context, method, URL, and body reader.
+	req, err := http.NewRequestWithContext(ctx, method, url, bodyReader)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sets the headers for the request.
+	req.Header.Set("apikey", c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Prefer", "return=representation")
+
+	return c.httpClient.Do(req)
+}
+
+// Represents a row in the plaid_items table.
+type PlaidItem struct {
+	ID              int64     `json:"id,omitempty"`
+	ItemID          string    `json:"item_id"`
+	AccessToken     string    `json:"access_token"`
+	InstitutionID   *string   `json:"institution_id,omitempty"`
+	InstitutionName *string   `json:"institution_name,omitempty"`
+	Status          string    `json:"status"`
+	LastUpdated     time.Time `json:"last_updated"`
+	CreatedAt       time.Time `json:"created_at,omitempty"`
+}
+
+// The JSON-safe representation for API responses (hides access_token).
+type PlaidItemJSON struct {
+	ItemID          string    `json:"itemId"`
+	InstitutionName string    `json:"institutionName,omitempty"`
+	Status          string    `json:"status"`
+	LastUpdated     time.Time `json:"lastUpdated"`
+}
+
+// Represents a row in the plaid_accounts table.
+type PlaidAccount struct {
+	ID             int64   `json:"id,omitempty"`
+	PlaidItemID    string  `json:"plaid_item_id"`
+	AccountID      string  `json:"account_id"`
+	Name           string  `json:"name"`
+	Mask           *string `json:"mask,omitempty"`
+	Type           string  `json:"type"`
+	Subtype        *string `json:"subtype,omitempty"`
+	CurrentBalance float64 `json:"current_balance"`
+}
+
+// Represents a row in the snaptrade_user table.
+type SnaptradeUser struct {
+	ID         int64  `json:"id,omitempty"`
+	UserID     string `json:"user_id"`
+	UserSecret string `json:"user_secret"`
+}
+
+// Represents a row in the snaptrade_connections table.
+type SnaptradeConnection struct {
+	ID         int64      `json:"id,omitempty"`
+	ConnID     string     `json:"conn_id"`
+	Brokerage  string     `json:"brokerage"`
+	Status     string     `json:"status"`
+	LastSynced *time.Time `json:"last_synced,omitempty"`
+}
+
+// The JSON-safe representation for API responses (hides conn_id).
+type SnaptradeConnectionJSON struct {
+	ID         string     `json:"id"`
+	Brokerage  string     `json:"brokerage"`
+	Status     string     `json:"status"`
+	LastSynced *time.Time `json:"lastSynced,omitempty"`
+}
+
+// Returns the JSON-safe representation of a PlaidItem.
+func (p *PlaidItem) ToJSON() PlaidItemJSON {
+	name := ""
+	if p.InstitutionName != nil {
+		name = *p.InstitutionName
+	}
+
+	return PlaidItemJSON{
+		ItemID:          p.ItemID,
+		InstitutionName: name,
+		Status:          p.Status,
+		LastUpdated:     p.LastUpdated,
+	}
+}
+
+// Inserts or updates a Plaid item.
+func (c *Client) UpsertPlaidItem(ctx context.Context, item *PlaidItem) error {
+	url := c.restURL("plaid_items") + "?on_conflict=item_id"
+
+	resp, err := c.doRequest(ctx, http.MethodPost, url, item)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert plaid_items failed: %s", string(body))
+	}
+	return nil
+}
+
+// Returns all Plaid items.
+func (c *Client) ListPlaidItems(ctx context.Context) ([]PlaidItem, error) {
+	url := c.restURL("plaid_items") + "?order=last_updated.desc"
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list plaid_items failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of Plaid items.
+	var items []PlaidItem
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// Returns a Plaid item by its Plaid item_id.
+func (c *Client) GetPlaidItemByItemID(ctx context.Context, itemID string) (*PlaidItem, error) {
+	url := c.restURL("plaid_items") + "?item_id=eq." + itemID
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase get plaid_item failed: %s", string(body))
+	}
+
+	// Decodes the response body into a Plaid item.
+	var items []PlaidItem
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	return &items[0], nil
+}
+
+// Deletes a Plaid item by its Plaid item_id.
+func (c *Client) DeletePlaidItem(ctx context.Context, itemID string) error {
+	url := c.restURL("plaid_items") + "?item_id=eq." + itemID
+
+	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase delete plaid_item failed: %s", string(body))
+	}
+	return nil
+}
+
+// Inserts or updates multiple Plaid accounts.
+func (c *Client) UpsertPlaidAccounts(ctx context.Context, accounts []PlaidAccount) error {
+	if len(accounts) == 0 {
+		return nil
+	}
+
+	url := c.restURL("plaid_accounts") + "?on_conflict=account_id"
+
+	resp, err := c.doRequest(ctx, http.MethodPost, url, accounts)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert plaid_accounts failed: %s", string(body))
+	}
+	return nil
+}
+
+// Deletes all accounts for a Plaid item.
+func (c *Client) DeletePlaidAccountsByItemID(ctx context.Context, itemID string) error {
+	url := c.restURL("plaid_accounts") + "?plaid_item_id=eq." + itemID
+
+	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase delete plaid_accounts failed: %s", string(body))
+	}
+	return nil
+}
+
+// Converts a SnaptradeConnection to its JSON-safe representation.
+func (s *SnaptradeConnection) ToJSON() SnaptradeConnectionJSON {
+	return SnaptradeConnectionJSON{
+		ID:         s.ConnID,
+		Brokerage:  s.Brokerage,
+		Status:     s.Status,
+		LastSynced: s.LastSynced,
+	}
+}
+
+// Returns the Snaptrade user.
+func (c *Client) GetSnaptradeUser(ctx context.Context) (*SnaptradeUser, error) {
+	url := c.restURL("snaptrade_user") + "?limit=1"
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil
+	}
+
+	// Decodes the response body into a Snaptrade user.
+	var users []SnaptradeUser
+	if err := json.NewDecoder(resp.Body).Decode(&users); err != nil || len(users) == 0 {
+		return nil, nil
+	}
+	return &users[0], nil
+}
+
+// Inserts a new Snaptrade user into the database.
+func (c *Client) CreateSnaptradeUser(ctx context.Context, userID, userSecret string) (*SnaptradeUser, error) {
+	user := &SnaptradeUser{
+		UserID:     userID,
+		UserSecret: userSecret,
+	}
+
+	url := c.restURL("snaptrade_user")
+	resp, err := c.doRequest(ctx, http.MethodPost, url, user)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase insert snaptrade_user failed: %s", string(body))
+	}
+
+	return user, nil
+}
+
+// Inserts or updates Snaptrade connections
+func (c *Client) UpsertSnaptradeConnections(ctx context.Context, conns []SnaptradeConnection) error {
+	// Deletes all existing connections first since Snaptrade's API returns full connection list.
+	delURL := c.restURL("snaptrade_connections")
+	delResp, err := c.doRequest(ctx, http.MethodDelete, delURL+"?id=gt.0", nil)
+	if err != nil {
+		return err
+	}
+	delResp.Body.Close()
+
+	if len(conns) == 0 {
+		return nil
+	}
+
+	// Inserts new connections since Snaptrade's API doesn't support upsert.
+	url := c.restURL("snaptrade_connections")
+	resp, err := c.doRequest(ctx, http.MethodPost, url, conns)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert snaptrade_connections failed: %s", string(body))
+	}
+	return nil
+}
+
+// Returns all Snaptrade connections.
+func (c *Client) ListSnaptradeConnections(ctx context.Context) ([]SnaptradeConnection, error) {
+	url := c.restURL("snaptrade_connections") + "?order=last_synced.desc"
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list snaptrade_connections failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of Snaptrade connections.
+	var conns []SnaptradeConnection
+	if err := json.NewDecoder(resp.Body).Decode(&conns); err != nil {
+		return nil, err
+	}
+	return conns, nil
+}
+
+// Deletes a Snaptrade connection by its connection ID.
+func (c *Client) DeleteSnaptradeConnection(ctx context.Context, connID string) error {
+	url := c.restURL("snaptrade_connections") + "?conn_id=eq." + connID
+
+	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase delete snaptrade_connection failed: %s", string(body))
+	}
+	return nil
+}

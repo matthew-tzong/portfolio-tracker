@@ -1,12 +1,40 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { apiRequest } from '../lib/api'
 import { supabase } from '../lib/supabase'
+import { PlaidLinkButton } from './PlaidLinkButton'
+import { SnaptradeConnectSection } from './SnaptradeConnectSection.tsx'
 
 // Main signed-in dashboard for the single-user app, shows autheticated user
 export function Dashboard() {
   const [user, setUser] = useState<{ email?: string } | null>(null)
   const [pingResult, setPingResult] = useState<string>('')
   const [loading, setLoading] = useState(false)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
+
+  // Handles the Plaid link success message.
+  const handlePlaidLinked = () => {
+    setSuccessMessage('Bank account linked successfully!')
+    setTimeout(() => setSuccessMessage(null), 5000)
+  }
+
+  // Handles the Snaptrade connection success message + sync.
+  const handleSnaptradeConnected = () => {
+    ;(async () => {
+      // Sync the Snaptrade connections.
+      try {
+        await apiRequest('/api/snaptrade/sync-connections', { method: 'POST' })
+        setSuccessMessage('Brokerage connection synced successfully!')
+      } catch (err: unknown) {
+        // If sync fails, then say that the sync may not be up to date.
+        setSuccessMessage(
+          `Snaptrade Connect opened, but sync may not be up to date: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        )
+      } finally {
+        setTimeout(() => setSuccessMessage(null), 5000)
+      }
+    })()
+  }
 
   // On mount, fetch the current authenticated user so we can show their email.
   useEffect(() => {
@@ -15,7 +43,7 @@ export function Dashboard() {
     })
   }, [])
 
-  // Calls protected endpoint to test validation of the Supabase JWT
+  // Tests the validation of the Supabase JWT.
   const testProtectedEndpoint = async () => {
     setLoading(true)
     try {
@@ -33,19 +61,34 @@ export function Dashboard() {
     await supabase.auth.signOut()
   }
 
+  // Returns the dashboard.
   return (
     <div className="max-w-3xl mx-auto py-12 px-5">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-2xl font-semibold text-gray-900">My portfolio</h1>
-        <button
-          onClick={handleSignOut}
-          className="py-2 px-4 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-        >
-          Sign Out
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            to="/links"
+            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+          >
+            Manage connections
+          </Link>
+          <button
+            onClick={handleSignOut}
+            className="py-2 px-4 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+          >
+            Sign Out
+          </button>
+        </div>
       </div>
 
       <p className="text-gray-600 mb-6">Signed in as {user?.email ?? '...'}</p>
+
+      {successMessage && (
+        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-sm font-medium text-green-800">{successMessage}</p>
+        </div>
+      )}
 
       <div className="mb-6 p-5 bg-gray-100 rounded-lg">
         <h2 className="text-lg font-medium text-gray-900 mb-1">Protected API Test</h2>
@@ -64,13 +107,15 @@ export function Dashboard() {
         )}
       </div>
 
-      <div className="p-5 bg-blue-50 rounded-lg border border-blue-100">
-        <h2 className="text-lg font-medium text-gray-900 mb-2">Next steps</h2>
-        <ul className="list-disc list-inside text-gray-700 space-y-1">
-          <li>Link your Plaid accounts (Slice 2)</li>
-          <li>Link your Snaptrade connection (Slice 2)</li>
-          <li>View your accounts and net worth (Slice 3)</li>
-        </ul>
+      <div className="grid gap-6 md:grid-cols-2 mt-6">
+        <div className="p-5 bg-blue-50 rounded-lg border border-blue-100">
+          <h2 className="text-lg font-medium text-gray-900 mb-2">Connections</h2>
+          <p className="text-sm text-gray-700 mb-3">
+            Start by linking your bank or credit card accounts.
+          </p>
+          <PlaidLinkButton onLinked={handlePlaidLinked} />
+        </div>
+        <SnaptradeConnectSection onConnected={handleSnaptradeConnected} />
       </div>
     </div>
   )

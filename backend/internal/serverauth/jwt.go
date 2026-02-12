@@ -163,5 +163,3 @@ func extractBearerToken(header string) (string, error) {
 	}
 	return strings.TrimSpace(parts[1]), nil
 }
-
-

@@ -1,9 +1,9 @@
 package main
 
 import (
+	"github.com/matthewtzong/portfolio-tracker/backend/internal/server"
 	"log"
 	"os"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/server"
 )
 
 func main() {
