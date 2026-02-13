@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -66,62 +67,6 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body interfa
 	req.Header.Set("Prefer", "return=representation")
 
 	return c.httpClient.Do(req)
-}
-
-// Represents a row in the plaid_items table.
-type PlaidItem struct {
-	ID              int64     `json:"id,omitempty"`
-	ItemID          string    `json:"item_id"`
-	AccessToken     string    `json:"access_token"`
-	InstitutionID   *string   `json:"institution_id,omitempty"`
-	InstitutionName *string   `json:"institution_name,omitempty"`
-	Status          string    `json:"status"`
-	LastUpdated     time.Time `json:"last_updated"`
-	CreatedAt       time.Time `json:"created_at,omitempty"`
-}
-
-// The JSON-safe representation for API responses (hides access_token).
-type PlaidItemJSON struct {
-	ItemID          string    `json:"itemId"`
-	InstitutionName string    `json:"institutionName,omitempty"`
-	Status          string    `json:"status"`
-	LastUpdated     time.Time `json:"lastUpdated"`
-}
-
-// Represents a row in the plaid_accounts table.
-type PlaidAccount struct {
-	ID             int64   `json:"id,omitempty"`
-	PlaidItemID    string  `json:"plaid_item_id"`
-	AccountID      string  `json:"account_id"`
-	Name           string  `json:"name"`
-	Mask           *string `json:"mask,omitempty"`
-	Type           string  `json:"type"`
-	Subtype        *string `json:"subtype,omitempty"`
-	CurrentBalance float64 `json:"current_balance"`
-}
-
-// Represents a row in the snaptrade_user table.
-type SnaptradeUser struct {
-	ID         int64  `json:"id,omitempty"`
-	UserID     string `json:"user_id"`
-	UserSecret string `json:"user_secret"`
-}
-
-// Represents a row in the snaptrade_connections table.
-type SnaptradeConnection struct {
-	ID         int64      `json:"id,omitempty"`
-	ConnID     string     `json:"conn_id"`
-	Brokerage  string     `json:"brokerage"`
-	Status     string     `json:"status"`
-	LastSynced *time.Time `json:"last_synced,omitempty"`
-}
-
-// The JSON-safe representation for API responses (hides conn_id).
-type SnaptradeConnectionJSON struct {
-	ID         string     `json:"id"`
-	Brokerage  string     `json:"brokerage"`
-	Status     string     `json:"status"`
-	LastSynced *time.Time `json:"lastSynced,omitempty"`
 }
 
 // Returns the JSON-safe representation of a PlaidItem.
@@ -205,6 +150,32 @@ func (c *Client) GetPlaidItemByItemID(ctx context.Context, itemID string) (*Plai
 	return &items[0], nil
 }
 
+// Returns a Plaid item by institution_id (for detecting existing connections).
+func (c *Client) GetPlaidItemByInstitutionID(ctx context.Context, institutionID string) (*PlaidItem, error) {
+	url := c.restURL("plaid_items") + "?institution_id=eq." + institutionID + "&limit=1"
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase get plaid_item by institution_id failed: %s", string(body))
+	}
+
+	// Decodes the response body into a Plaid item
+	var items []PlaidItem
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return nil, err
+	}
+	if len(items) == 0 {
+		return nil, nil
+	}
+	return &items[0], nil
+}
+
 // Deletes a Plaid item by its Plaid item_id.
 func (c *Client) DeletePlaidItem(ctx context.Context, itemID string) error {
 	url := c.restURL("plaid_items") + "?item_id=eq." + itemID
@@ -260,6 +231,30 @@ func (c *Client) DeletePlaidAccountsByItemID(ctx context.Context, itemID string)
 	return nil
 }
 
+// Returns all Plaid accounts.
+func (c *Client) ListPlaidAccounts(ctx context.Context) ([]PlaidAccount, error) {
+	url := c.restURL("plaid_accounts")
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list plaid_accounts failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of Plaid accounts.
+	var accounts []PlaidAccount
+	err = json.NewDecoder(resp.Body).Decode(&accounts)
+	if err != nil {
+		return nil, err
+	}
+	return accounts, nil
+}
+
 // Converts a SnaptradeConnection to its JSON-safe representation.
 func (s *SnaptradeConnection) ToJSON() SnaptradeConnectionJSON {
 	return SnaptradeConnectionJSON{
@@ -313,22 +308,21 @@ func (c *Client) CreateSnaptradeUser(ctx context.Context, userID, userSecret str
 	return user, nil
 }
 
-// Inserts or updates Snaptrade connections
+// Upserts or Delete Snaptrade connections
 func (c *Client) UpsertSnaptradeConnections(ctx context.Context, conns []SnaptradeConnection) error {
-	// Deletes all existing connections first since Snaptrade's API returns full connection list.
-	delURL := c.restURL("snaptrade_connections")
-	delResp, err := c.doRequest(ctx, http.MethodDelete, delURL+"?id=gt.0", nil)
-	if err != nil {
-		return err
-	}
-	delResp.Body.Close()
-
+	// If no connections from API, delete all.
 	if len(conns) == 0 {
+		deletionURL := c.restURL("snaptrade_connections")
+		deletionResponse, err := c.doRequest(ctx, http.MethodDelete, deletionURL+"?id=gt.0", nil)
+		if err != nil {
+			return err
+		}
+		deletionResponse.Body.Close()
 		return nil
 	}
 
-	// Inserts new connections since Snaptrade's API doesn't support upsert.
-	url := c.restURL("snaptrade_connections")
+	// Upsert by conn_id (update existing, insert new).
+	url := c.restURL("snaptrade_connections") + "?on_conflict=conn_id"
 	resp, err := c.doRequest(ctx, http.MethodPost, url, conns)
 	if err != nil {
 		return err
@@ -338,6 +332,69 @@ func (c *Client) UpsertSnaptradeConnections(ctx context.Context, conns []Snaptra
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("supabase upsert snaptrade_connections failed: %s", string(body))
+	}
+
+	// Delete connections no longer returned by the API.
+	existingIDs := make([]string, 0, len(conns))
+	for _, conn := range conns {
+		existingIDs = append(existingIDs, conn.ConnID)
+	}
+	return c.deleteSnaptradeConnectionsNotIn(ctx, existingIDs)
+}
+
+// Deletes Snaptrade connections not in the list of existing IDs.
+func (c *Client) deleteSnaptradeConnectionsNotIn(ctx context.Context, existingIDs []string) error {
+	if len(existingIDs) == 0 {
+		return nil
+	}
+
+	// PostgREST: conn_id=not.in.(existingIDs)
+	var b strings.Builder
+	b.WriteString("not.in.(")
+	for i, id := range existingIDs {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		escaped := strings.ReplaceAll(id, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+		b.WriteString("\"" + escaped + "\"")
+	}
+	b.WriteString(")")
+
+	// Delete the connections
+	deletionURL := c.restURL("snaptrade_connections") + "?conn_id=" + url.QueryEscape(b.String())
+	deletionResponse, err := c.doRequest(ctx, http.MethodDelete, deletionURL, nil)
+	if err != nil {
+		return err
+	}
+	defer deletionResponse.Body.Close()
+	if deletionResponse.StatusCode < 200 || deletionResponse.StatusCode >= 300 {
+		body, _ := io.ReadAll(deletionResponse.Body)
+		return fmt.Errorf("supabase delete snaptrade_connections not in failed: %s", string(body))
+	}
+	return nil
+}
+
+// Updates the status and last_synced for existing connections.
+func (c *Client) UpdateSnaptradeConnectionStatuses(ctx context.Context, conns []SnaptradeConnection) error {
+	for _, conn := range conns {
+		payload := map[string]interface{}{
+			"status":      conn.Status,
+			"last_synced": conn.LastSynced,
+		}
+
+		// Patch the connection by conn_id.
+		patchURL := c.restURL("snaptrade_connections") + "?conn_id=eq." + url.QueryEscape(conn.ConnID)
+		resp, err := c.doRequest(ctx, http.MethodPatch, patchURL, payload)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			body, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("supabase patch snaptrade_connection %s failed: %s", conn.ConnID, string(body))
+		}
 	}
 	return nil
 }
@@ -380,4 +437,60 @@ func (c *Client) DeleteSnaptradeConnection(ctx context.Context, connID string) e
 		return fmt.Errorf("supabase delete snaptrade_connection failed: %s", string(body))
 	}
 	return nil
+}
+
+// Represents a row in the plaid_items table.
+type PlaidItem struct {
+	ID              int64     `json:"id,omitempty"`
+	ItemID          string    `json:"item_id"`
+	AccessToken     string    `json:"access_token"`
+	InstitutionID   *string   `json:"institution_id,omitempty"`
+	InstitutionName *string   `json:"institution_name,omitempty"`
+	Status          string    `json:"status"`
+	LastUpdated     time.Time `json:"last_updated"`
+	CreatedAt       time.Time `json:"created_at,omitempty"`
+}
+
+// The JSON-safe representation for API responses (hides access_token).
+type PlaidItemJSON struct {
+	ItemID          string    `json:"itemId"`
+	InstitutionName string    `json:"institutionName,omitempty"`
+	Status          string    `json:"status"`
+	LastUpdated     time.Time `json:"lastUpdated"`
+}
+
+// Represents a row in the plaid_accounts table.
+type PlaidAccount struct {
+	ID             int64   `json:"id,omitempty"`
+	PlaidItemID    string  `json:"plaid_item_id"`
+	AccountID      string  `json:"account_id"`
+	Name           string  `json:"name"`
+	Mask           *string `json:"mask,omitempty"`
+	Type           string  `json:"type"`
+	Subtype        *string `json:"subtype,omitempty"`
+	CurrentBalance float64 `json:"current_balance"`
+}
+
+// Represents a row in the snaptrade_user table.
+type SnaptradeUser struct {
+	ID         int64  `json:"id,omitempty"`
+	UserID     string `json:"user_id"`
+	UserSecret string `json:"user_secret"`
+}
+
+// Represents a row in the snaptrade_connections table.
+type SnaptradeConnection struct {
+	ID         int64      `json:"id,omitempty"`
+	ConnID     string     `json:"conn_id"`
+	Brokerage  string     `json:"brokerage"`
+	Status     string     `json:"status"`
+	LastSynced *time.Time `json:"last_synced,omitempty"`
+}
+
+// The JSON-safe representation for API responses (hides conn_id).
+type SnaptradeConnectionJSON struct {
+	ID         string     `json:"id"`
+	Brokerage  string     `json:"brokerage"`
+	Status     string     `json:"status"`
+	LastSynced *time.Time `json:"lastSynced,omitempty"`
 }

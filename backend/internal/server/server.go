@@ -61,6 +61,13 @@ func Run() error {
 		snaptradeClient: snaptradeClient,
 	})
 
+	// Registers the accounts and net worth routes.
+	registerAccountsRoutes(mux, apiDependencies{
+		db:              dbClient,
+		plaidClient:     plaidClient,
+		snaptradeClient: snaptradeClient,
+	})
+
 	handler := withCORS(mux)
 
 	port := getEnv("PORT", "8080")

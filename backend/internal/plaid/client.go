@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 )
 
@@ -54,6 +55,11 @@ func NewClientFromEnv() (*Client, error) {
 
 // Creates a Plaid Link token for the given user.
 func (c *Client) CreateLinkToken(ctx context.Context, userID string) (string, error) {
+	return c.CreateLinkTokenWithAccessToken(ctx, userID, "")
+}
+
+// Creates a Plaid Link token in update mode for reconnecting an existing item.
+func (c *Client) CreateLinkTokenWithAccessToken(ctx context.Context, userID, accessToken string) (string, error) {
 	// Constructs the request body for the Plaid Link token create request.
 	reqBody := linkTokenCreateRequest{
 		ClientID:   c.clientID,
@@ -65,6 +71,10 @@ func (c *Client) CreateLinkToken(ctx context.Context, userID string) (string, er
 		Products:     []string{"transactions"},
 		CountryCodes: []string{"US"},
 		Language:     "en",
+	}
+	// If accessToken is provided, use update mode to reconnect an existing item.
+	if accessToken != "" {
+		reqBody.AccessToken = &accessToken
 	}
 
 	var resp linkTokenCreateResponse
@@ -113,6 +123,32 @@ func (c *Client) GetAccounts(ctx context.Context, accessToken string) ([]Account
 	return resp.Accounts, nil
 }
 
+// Gets item status for a given access token.
+func (c *Client) GetItem(ctx context.Context, accessToken string) (*ItemStatus, error) {
+	reqBody := itemGetRequest{
+		ClientID:    c.clientID,
+		Secret:      c.secret,
+		AccessToken: accessToken,
+	}
+	var resp itemGetResponse
+	err := c.postJSON(ctx, "/item/get", reqBody, &resp)
+	if err != nil {
+		return nil, err
+	}
+	return &resp.Item, nil
+}
+
+// Removes a Plaid item.
+func (c *Client) RemoveItem(ctx context.Context, accessToken string) error {
+	reqBody := itemRemoveRequest{
+		ClientID:    c.clientID,
+		Secret:      c.secret,
+		AccessToken: accessToken,
+	}
+	var resp itemRemoveResponse
+	return c.postJSON(ctx, "/item/remove", reqBody, &resp)
+}
+
 // Posts a JSON body and decodes a JSON response.
 func (c *Client) postJSON(ctx context.Context, path string, input, output interface{}) error {
 	// Marshals the request body into a JSON string.
@@ -139,9 +175,18 @@ func (c *Client) postJSON(ctx context.Context, path string, input, output interf
 		var plaidErr plaidErrorResponse
 		_ = json.NewDecoder(resp.Body).Decode(&plaidErr)
 		if plaidErr.ErrorMessage != "" {
-			return fmt.Errorf("plaid API error: %s (%s)", plaidErr.ErrorMessage, plaidErr.ErrorCode)
+			return &PlaidConnectionError{
+				ErrorCode:    plaidErr.ErrorCode,
+				ErrorMessage: plaidErr.ErrorMessage,
+				ErrorType:    plaidErr.ErrorType,
+				IsAuthError:  isPlaidAuthError(plaidErr.ErrorCode),
+			}
 		}
-		return fmt.Errorf("plaid API error: status %d", resp.StatusCode)
+		return &PlaidConnectionError{
+			ErrorCode:    fmt.Sprintf("HTTP_%d", resp.StatusCode),
+			ErrorMessage: fmt.Sprintf("HTTP status %d", resp.StatusCode),
+			IsAuthError:  false,
+		}
 	}
 
 	// Decodes the response body into the output.
@@ -161,6 +206,7 @@ type linkTokenCreateRequest struct {
 	CountryCodes []string      `json:"country_codes"`
 	Language     string        `json:"language"`
 	Webhook      string        `json:"webhook,omitempty"`
+	AccessToken  *string       `json:"access_token,omitempty"`
 }
 
 // User object for the link token create request.
@@ -188,6 +234,13 @@ type itemPublicTokenExchangeResponse struct {
 
 // Request body for fetching accounts for a given access token.
 type accountsGetRequest struct {
+	ClientID    string `json:"client_id"`
+	Secret      string `json:"secret"`
+	AccessToken string `json:"access_token"`
+}
+
+// Plaid Item Request body.
+type itemGetRequest struct {
 	ClientID    string `json:"client_id"`
 	Secret      string `json:"secret"`
 	AccessToken string `json:"access_token"`
@@ -222,4 +275,52 @@ type plaidErrorResponse struct {
 	RequestID        string `json:"request_id"`
 	SuggestedAction  string `json:"suggested_action"`
 	DocumentationURL string `json:"documentation_url"`
+}
+
+// Represents a Plaid connection error.
+type PlaidConnectionError struct {
+	ErrorCode    string
+	ErrorMessage string
+	ErrorType    string
+	IsAuthError  bool
+}
+
+// Error Interface for PlaidConnectionError.
+func (e *PlaidConnectionError) Error() string {
+	return fmt.Sprintf("plaid API error: %s (%s)", e.ErrorMessage, e.ErrorCode)
+}
+
+// Determines if a Plaid error code indicates authentication/reconnection is needed.
+func isPlaidAuthError(errorCode string) bool {
+	authErrorCodes := []string{
+		"ITEM_LOGIN_REQUIRED",
+		"INVALID_ACCESS_TOKEN",
+		"ACCESS_TOKEN_EXPIRED",
+		"ACCESS_TOKEN_INVALID",
+	}
+	return slices.Contains(authErrorCodes, errorCode)
+}
+
+// Plaid item status information.
+type ItemStatus struct {
+	ItemID                string  `json:"item_id"`
+	Status                string  `json:"status"`
+	ConsentExpirationTime *string `json:"consent_expiration_time,omitempty"`
+}
+
+// Plaid Item Status response from Plaid.
+type itemGetResponse struct {
+	Item ItemStatus `json:"item"`
+}
+
+// Request body for removing a Plaid item.
+type itemRemoveRequest struct {
+	ClientID    string `json:"client_id"`
+	Secret      string `json:"secret"`
+	AccessToken string `json:"access_token"`
+}
+
+// Response body for removing a Plaid item.
+type itemRemoveResponse struct {
+	RequestID string `json:"request_id"`
 }

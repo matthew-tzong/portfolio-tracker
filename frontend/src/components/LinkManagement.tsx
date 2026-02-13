@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react'
 import { apiRequest } from '../lib/api'
 import { Link } from 'react-router-dom'
+import { openSnaptradeConnect, syncSnaptradeConnections } from '../lib/snaptrade'
+import { PlaidLinkButton } from './PlaidLinkButton'
+import { SnaptradeConnectSection } from './SnaptradeConnectSection'
 
 // Types for the Plaid item.
 interface PlaidItem {
@@ -29,13 +32,11 @@ export function LinkManagement() {
   const [data, setData] = useState<LinksResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [actionMessage, setActionMessage] = useState<string | null>(null)
 
   // Loads the links.
   const load = async () => {
     setLoading(true)
     setError(null)
-    setActionMessage(null)
     try {
       const res = await apiRequest<LinksResponse>('/api/links')
       setData(res)
@@ -46,12 +47,13 @@ export function LinkManagement() {
     }
   }
 
-  // Syncs Snaptrade connections from the API into the database.
-  const syncSnaptradeConnections = async () => {
+  // Reconnects a Snaptrade connection by opening Connect portal.
+  const reconnectSnaptradeConnection = async () => {
+    setError(null)
     try {
-      await apiRequest('/api/snaptrade/sync-connections', { method: 'POST' })
+      await openSnaptradeConnect(load)
     } catch (err: unknown) {
-      throw new Error(err instanceof Error ? err.message : 'Failed to sync Snaptrade connections')
+      setError(err instanceof Error ? err.message : 'Failed to open Snaptrade Connect')
     }
   }
 
@@ -61,30 +63,75 @@ export function LinkManagement() {
 
   // Removes a Plaid item.
   const removePlaidItem = async (itemId: string) => {
-    setActionMessage(null)
     setError(null)
     try {
       await apiRequest('/api/plaid/remove-item', {
         method: 'POST',
         body: JSON.stringify({ itemId }),
       })
-      setActionMessage('Plaid item removed.')
       await load()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to remove Plaid item')
     }
   }
 
+  // Reconnects a Plaid item by opening Link in update mode.
+  const reconnectPlaidItem = async (itemId: string) => {
+    setError(null)
+    try {
+      if (!window.Plaid) {
+        throw new Error('Plaid Link script not loaded')
+      }
+
+      // Get reconnect link token.
+      const { linkToken } = await apiRequest<{ linkToken: string }>(
+        '/api/plaid/reconnect-link-token',
+        {
+          method: 'POST',
+          body: JSON.stringify({ itemId }),
+        },
+      )
+
+      // Create Plaid Link handler.
+      const handler = window.Plaid.create({
+        token: linkToken,
+        onSuccess: async (publicToken, metadata) => {
+          try {
+            await apiRequest('/api/plaid/exchange-token', {
+              method: 'POST',
+              body: JSON.stringify({
+                publicToken,
+                institutionName: metadata.institution?.name,
+                institutionId: metadata.institution?.institution_id,
+              }),
+            })
+            await load()
+          } catch (err) {
+            console.error('Failed to reconnect Plaid item', err)
+            setError('Failed to reconnect Plaid item')
+          }
+        },
+        onExit: (err) => {
+          if (err) {
+            console.error('Plaid Link exited with error', err)
+          }
+        },
+      })
+
+      handler.open()
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to reconnect Plaid item')
+    }
+  }
+
   // Removes a Snaptrade connection.
   const removeSnaptradeConnection = async (connectionId: string) => {
-    setActionMessage(null)
     setError(null)
     try {
       await apiRequest('/api/snaptrade/remove-connection', {
         method: 'POST',
         body: JSON.stringify({ connectionId }),
       })
-      setActionMessage('Snaptrade connection removed.')
       await syncSnaptradeConnections()
       await load()
     } catch (err: unknown) {
@@ -97,21 +144,12 @@ export function LinkManagement() {
     <div className="max-w-4xl mx-auto py-12 px-5">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold text-gray-900">Connections</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            to="/dashboard"
-            className="py-2 px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
-          >
-            Dashboard
-          </Link>
-          <button
-            type="button"
-            onClick={() => load()}
-            className="py-2 px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
-          >
-            Refresh
-          </button>
-        </div>
+        <Link
+          to="/dashboard"
+          className="py-2 px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+        >
+          Dashboard
+        </Link>
       </div>
       <p className="text-sm text-gray-600 mb-4">
         Manage your Plaid bank connections and Snaptrade brokerage connections. This app is
@@ -130,11 +168,17 @@ export function LinkManagement() {
         </div>
       )}
 
-      {actionMessage && (
-        <div className="mt-4 text-sm text-green-700">
-          <p>{actionMessage}</p>
+      {/* Add new connections */}
+      <div className="mt-6 grid gap-6 md:grid-cols-2">
+        <div className="p-5 bg-blue-50 rounded-lg border border-blue-100">
+          <h2 className="text-lg font-medium text-gray-900 mb-2">Add Plaid connection</h2>
+          <p className="text-sm text-gray-700 mb-3">
+            Link your bank or credit card accounts via Plaid.
+          </p>
+          <PlaidLinkButton onLinked={load} />
         </div>
-      )}
+        <SnaptradeConnectSection onConnected={load} />
+      </div>
 
       {!loading && data && (
         <div className="mt-6 space-y-6">
@@ -142,7 +186,7 @@ export function LinkManagement() {
             <h2 className="text-lg font-medium text-gray-900 mb-2">Plaid items</h2>
             {data.plaidItems.length === 0 ? (
               <p className="text-sm text-gray-600">
-                No Plaid connections yet. Use the dashboard to link an account.
+                No Plaid connections yet. Add a connection above to get started.
               </p>
             ) : (
               <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
@@ -183,13 +227,24 @@ export function LinkManagement() {
                           {new Date(item.lastUpdated).toLocaleString()}
                         </td>
                         <td className="px-4 py-2 text-right">
-                          <button
-                            type="button"
-                            onClick={() => removePlaidItem(item.itemId)}
-                            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                          >
-                            Remove
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            {item.status !== 'OK' && (
+                              <button
+                                type="button"
+                                onClick={() => reconnectPlaidItem(item.itemId)}
+                                className="inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 shadow-sm hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                              >
+                                Reconnect
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removePlaidItem(item.itemId)}
+                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -203,8 +258,7 @@ export function LinkManagement() {
             <h2 className="text-lg font-medium text-gray-900 mb-2">Snaptrade connections</h2>
             {data.snaptradeConnections.length === 0 ? (
               <p className="text-sm text-gray-600">
-                No Snaptrade connections yet. Use the dashboard to open Snaptrade Connect; this page
-                will refresh connections automatically.
+                No Snaptrade connections yet. Add a connection above to get started.
               </p>
             ) : (
               <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
@@ -231,7 +285,9 @@ export function LinkManagement() {
                             className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                               conn.status === 'OK'
                                 ? 'bg-green-50 text-green-700'
-                                : 'bg-red-50 text-red-700'
+                                : conn.status === 'ACCOUNT_FETCH_ERROR'
+                                  ? 'bg-yellow-50 text-yellow-700'
+                                  : 'bg-red-50 text-red-700'
                             }`}
                           >
                             {conn.status}
@@ -241,13 +297,24 @@ export function LinkManagement() {
                           {conn.lastSynced ? new Date(conn.lastSynced).toLocaleString() : '—'}
                         </td>
                         <td className="px-4 py-2 text-right">
-                          <button
-                            type="button"
-                            onClick={() => removeSnaptradeConnection(conn.id)}
-                            className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-                          >
-                            Remove
-                          </button>
+                          <div className="flex items-center justify-end gap-2">
+                            {conn.status === 'CONNECTION_ERROR' && (
+                              <button
+                                type="button"
+                                onClick={() => reconnectSnaptradeConnection()}
+                                className="inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 shadow-sm hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                              >
+                                Reconnect
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeSnaptradeConnection(conn.id)}
+                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

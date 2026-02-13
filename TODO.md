@@ -52,20 +52,18 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 ## Slice 3: Accounts and net worth (current balances)
 
-**Goal:** Dashboard shows all linked accounts and a single “net worth” number (sum of balances; no historical snapshots yet).
+**Goal:** Dashboard shows all linked accounts and a single "net worth" number (sum of balances; no historical snapshots yet).
 
-- [ ] **3.1 Fetch and store balances (Go)**
-  - [ ] Go: for each Plaid item, call Plaid balances/accounts; upsert `plaid_accounts` in Supabase. For Snaptrade, fetch account balances and store or derive cash per account.
-  - [ ] Endpoint(s) to trigger sync and/or to return current accounts and balances (e.g. `GET /api/accounts`).
-- [ ] **3.2 Net worth calculation (Go)**
-  - [ ] Compute net worth = cash + investment value − liabilities. Put logic in `backend/internal/` or `backend/pkg/`; use from API handler.
-- [ ] **3.3 Dashboard UI (React)**
-  - [ ] Page or section: fetch accounts and net worth from Go API; list accounts (name, type, balance, mask); display net worth (single number or breakdown: cash, investments, liabilities).
-- [ ] **3.4 Red alert and reconnect (Plaid + Snaptrade)**
-  - [ ] React: when status is broken, show red alert and “Reconnect” button on the connections/dashboard UI.
-  - [ ] Reconnect: Plaid = Link update or delete item (Go: `POST /api/plaid/remove-item`) + new Link; Snaptrade = open Connect again; Go updates stored connection.
-- [ ] **3.5 Plaid item rotation (optional)**
-  - [ ] Go: endpoint to remove item (`/item/remove`); React “Re-link” flow: call remove then open Link for the same institution; Go saves new item. Keep transactions/accounts keyed by institution/account so re-link preserves history.
+- [x] **3.1 Fetch and store balances (Go)**
+  - [x] Go: for each Plaid item, call Plaid balances/accounts; upsert `plaid_accounts` in Supabase. For Snaptrade, fetch account balances and store or derive cash per account.
+  - [x] Endpoint(s) to trigger sync and/or to return current accounts and balances (e.g. `GET /api/accounts`).
+- [x] **3.2 Net worth calculation (Go)**
+  - [x] Compute net worth = cash + investment value − liabilities. Put logic in `backend/internal/` or `backend/pkg/`; use from API handler.
+- [x] **3.3 Dashboard UI (React)**
+  - [x] Page or section: fetch accounts and net worth from Go API; list accounts (name, type, balance, mask); display net worth (single number or breakdown: cash, investments, liabilities).
+- [x] **3.4 Red alert and reconnect (Plaid + Snaptrade)**
+  - [x] React: when status is broken, show red alert and "Reconnect" button on the connections/dashboard UI.
+  - [x] Reconnect: Plaid = Link update or delete item (Go: `POST /api/plaid/remove-item`) + new Link; Snaptrade = open Connect again; Go updates stored connection.
 
 **Done when:** After linking, you see all accounts and one net worth number from the Go API when you load or refresh the dashboard.
 
@@ -73,13 +71,14 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 ## Slice 4: Transactions and expense tracker
 
-**Goal:** Plaid transactions use **webhooks + a single nightly cron**. **Webhooks** are primary: on `SYNC_UPDATES_AVAILABLE`, call `/transactions/sync` and upsert. **Nightly cron** is a safety check: run cursor-based sync to ensure the cursor is at the very end of the “book” (no missed transactions). Each transaction counts as an expense (category) and feeds overall liabilities. You can view/filter by month and category. Slice 5 uses these categories for monthly budget progress.
+**Goal:** Plaid transactions use **webhooks + a conditional end‑of‑day cron**. **Webhooks** are primary: when Plaid notifies us (e.g. via `SYNC_UPDATES_AVAILABLE`) that **new transactions were created for an item that day**, we record that fact. At end of day, a single cron job runs **only if at least one item had new transactions that day**, and then uses cursor‑based `/transactions/sync` to fetch and upsert **all transactions created that day**. Each transaction counts as an expense (category) and feeds overall liabilities. You can view/filter by month and category. Slice 5 uses these categories for monthly budget progress.
 
-- [ ] **4.1 Plaid webhook ingests transactions (Go)**
-  - [ ] Go: webhook `POST /api/webhooks/plaid` — verify signature; on `SYNC_UPDATES_AVAILABLE` call Plaid `/transactions/sync` (cursor-based) for that item and upsert into `transactions`. Deploy Go so Plaid can reach the URL.
+- [ ] **4.1 Plaid webhook marks "new transactions today" (Go)**
+  - [ ] Go: webhook `POST /api/webhooks/plaid` — verify signature; on `SYNC_UPDATES_AVAILABLE` (or equivalent) mark the corresponding Plaid item as having **new transactions for "today"** (e.g. record in a small table or flag).
   - [ ] Each stored transaction is treated as an expense (or credit/refund if positive): contributes to its category and to overall liabilities.
-- [ ] **4.2 Nightly Plaid safety check (Go, in Slice 7 cron)**
-  - [ ] In the same nightly cron: for each Plaid item, run cursor-based `/transactions/sync` and advance to the very end (ensure cursor is at end of book; catch anything webhooks might have missed). Persist any new/updated transactions.
+  - [ ] **Credit card refunds**: Positive transaction amounts on credit cards reduce liabilities (refunds add back to net worth). Negative amounts increase liabilities (expenses).
+- [ ] **4.2 End‑of‑day Plaid sync (Go, in Slice 7 cron)**
+  - [ ] In the nightly cron: **only if** at least one item was marked as "had new transactions today", run cursor‑based `/transactions/sync` for those items and upsert **all transactions created that day**. Clear/reset the "new transactions today" markers after a successful run.
 - [ ] **4.3 Categorization (Go)**
   - [ ] Store Plaid category on each transaction; map to `categories` or category_resolved so Slice 5 can sum spent per category for the month.
 - [ ] **4.4 Expense tracker UI (React)**
@@ -88,6 +87,8 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 **Done when:** Plaid webhook + nightly cron (cursor safety check) keep transactions in sync; they feed expense categories and liabilities; React lists/filters them. Slice 5 uses the same categories for monthly budget.
 
+**Note on credit card payments:** When a credit card bill is paid (transaction from checking account to credit card), we need to avoid double-counting. The Plaid-connected checking account balance will already reflect the outgoing payment; the main concern is not to treat that payment as a *new* expense on top of the already-recorded credit card transactions. Implementation: Detect payment transactions (checking → credit card), treat them as transfers that reduce the credit card liability / clear that billing period's expenses, and ensure they are not counted again as expenses. This logic should be added in Slice 4 or Slice 7 when handling transactions.
+
 ---
 
 ## Slice 5: Budget tracker
@@ -95,7 +96,7 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 **Goal:** Set a monthly budget by category and see progress (spent vs budget) using expense data.
 
 - [ ] **5.1 Budget model and API (Go)**
-  - [ ] Supabase: table `budgets` (month, allocations jsonb). Go: endpoints to create/update and read budget for a month; helper to compute “spent per category” from `transactions` for that month.
+  - [ ] Supabase: table `budgets` (month, allocations jsonb). Go: endpoints to create/update and read budget for a month; helper to compute "spent per category" from `transactions` for that month.
 - [ ] **5.2 Budget UI (React)**
   - [ ] Page: pick month; set budget per category (form); fetch budget and spent-from-Go. Show progress (bar or %) per category; highlight over-budget.
 
@@ -105,7 +106,7 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 ## Slice 6: Portfolio view (holdings, daily + monthly history)
 
-**Goal:** See Fidelity (Snaptrade) positions (live) and **daily** portfolio snapshots for recent time (current month + previous month), and **monthly** values for older months. Example: in April we store all daily snapshots for March and April, and only monthly data for January and February. After a month ends, we delete that month’s daily rows and keep only its monthly value (Slice 9).
+**Goal:** See Fidelity (Snaptrade) positions (live) and **daily** portfolio snapshots for recent time (current month + previous month), and **monthly** values for older months. Example: in April we store all daily snapshots for March and April, and only monthly data for January and February. After a month ends, we delete that month's daily rows and keep only its monthly value (Slice 9).
 
 - [ ] **6.1 Current holdings (Go + Snaptrade)**
   - [ ] Go: fetch Snaptrade positions per account (symbol, quantity, value); endpoint to return current holdings and account totals for the portfolio UI.
@@ -121,12 +122,12 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 ## Slice 7: Nightly cron — Plaid safety check + Snaptrade + daily snapshots
 
-**Goal:** One **nightly cron** at 11pm that: (1) **Plaid safety check** — for each Plaid item, run cursor-based `/transactions/sync` to the very end so the cursor is at end of book (catch anything webhooks missed). (2) **Snaptrade** — fetch holdings/balances, refresh connection status, and write **daily** portfolio snapshots for today (`daily_snapshots`, `daily_holdings`). (3) At end of month (or first run of new month), write that month’s rollup to `monthly_snapshots` and `monthly_holdings`. We **do** store daily snapshots for portfolio, but after a month we delete that month’s daily rows and keep only the monthly value (Slice 9). So we keep daily for current month + previous month only (e.g. in April: daily for March and April, monthly for January and February).
+**Goal:** One **nightly cron** at 11pm that: (1) **Plaid safety check** — for each Plaid item, run cursor-based `/transactions/sync` to the very end so the cursor is at end of book (catch anything webhooks missed). (2) **Snaptrade** — fetch holdings/balances, refresh connection status, and write **daily** portfolio snapshots for today (`daily_snapshots`, `daily_holdings`). (3) At end of month (or first run of new month), write that month's rollup to `monthly_snapshots` and `monthly_holdings`. We **do** store daily snapshots for portfolio, but after a month we delete that month's daily rows and keep only the monthly value (Slice 9). So we keep daily for current month + previous month only (e.g. in April: daily for March and April, monthly for January and February).
 
 - [ ] **7.1 Snapshot schema (Go + Supabase)**
   - [ ] Supabase: `daily_snapshots` (date, net_worth_cents, portfolio_value_cents, cash_cents, liabilities_cents); `daily_holdings` (date, account_id, symbol, quantity, value_cents); `monthly_snapshots` (month, …); `monthly_holdings` (month, account_id, symbol, value_cents).
 - [ ] **7.2 Cron job — Plaid safety + Snaptrade + daily snapshots (Go)**
-  - [ ] Go: endpoint `POST /api/cron/daily-sync` that (1) **Plaid:** for each item, run cursor-based `/transactions/sync` to the end and upsert any new/updated transactions; (2) **Snaptrade:** fetch holdings/balances, refresh connection status, compute today’s net worth and per-holding values, insert into `daily_snapshots` and `daily_holdings`; (3) if today is last day of month or first run of new month, compute that month’s rollup and insert into `monthly_snapshots` and `monthly_holdings`. Protect with `CRON_SECRET`.
+  - [ ] Go: endpoint `POST /api/cron/daily-sync` that (1) **Plaid:** for each item, run cursor-based `/transactions/sync` to the end and upsert any new/updated transactions; (2) **Snaptrade:** fetch holdings/balances, refresh connection status, compute today's net worth and per-holding values, insert into `daily_snapshots` and `daily_holdings`; (3) if today is last day of month or first run of new month, compute that month's rollup and insert into `monthly_snapshots` and `monthly_holdings`. Protect with `CRON_SECRET`.
 - [ ] **7.3 Schedule (use whatever is free)**
   - [ ] Use a **free** scheduler: **GitHub Actions** or **Vercel Cron**. Call `POST https://<your-go-api>/api/cron/daily-sync` with `CRON_SECRET` at 11pm.
 - [ ] **7.4 API for charts**
@@ -151,7 +152,7 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 - [ ] **8.5 Budget progress (React)**
   - [ ] Per category: bar or donut showing spent vs budget for selected month (data from Go).
 - [ ] **8.6 Dashboard integration**
-  - [ ] Add charts to dashboard or “Insights” / “Graphs” page in React; keep chart components in `frontend/src/components/`.
+  - [ ] Add charts to dashboard or "Insights" / "Graphs" page in React; keep chart components in `frontend/src/components/`.
 
 **Done when:** You can view net worth, portfolio, per-holding, expenses, and budget as charts (React + Go API).
 
@@ -159,27 +160,27 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 ## Slice 9: Export and retention
 
-**Goal:** Export each month’s data as CSV before deleting it. Apply retention rules so daily data is pruned to monthly, then monthly to yearly, keeping DB small while preserving long-term summaries.
+**Goal:** Export each month's data as CSV before deleting it. Apply retention rules so daily data is pruned to monthly, then monthly to yearly, keeping DB small while preserving long-term summaries.
 
 **Retention rules**
 
-- **CC daily transactions:** Delete after **3 months**. Before deleting, keep **monthly overall** (e.g. total spent per category for the month). Export that month’s transactions as CSV before delete.
+- **CC daily transactions:** Delete after **3 months**. Before deleting, keep **monthly overall** (e.g. total spent per category for the month). Export that month's transactions as CSV before delete.
 - **CC monthly data:** Keep **1 year**; then delete. Keep **yearly overall** for CC (e.g. total balance or total spent per year). Export month as CSV before deleting.
-- **Portfolio daily:** We store **daily** snapshots for the **current month and previous month** only (e.g. in April: daily for March and April). After a month ends, **delete all daily** snapshots/holdings for that month and keep only the **monthly** value (one row in `monthly_snapshots` and rows in `monthly_holdings`). So in April we have daily for March + April, and monthly for January, February. Export that month’s daily data as CSV before deleting.
-- **Portfolio monthly** (`monthly_snapshots`, `monthly_holdings`): Keep **1 year**; then delete and keep **yearly overall**. Export that month’s data as CSV before deleting.
-- **Export-before-delete:** For any month being pruned (CC or portfolio), generate and offer download of that month’s CSV first, then delete the rows.
+- **Portfolio daily:** We store **daily** snapshots for the **current month and previous month** only (e.g. in April: daily for March and April). After a month ends, **delete all daily** snapshots/holdings for that month and keep only the **monthly** value (one row in `monthly_snapshots` and rows in `monthly_holdings`). So in April we have daily for March + April, and monthly for January, February. Export that month's daily data as CSV before deleting.
+- **Portfolio monthly** (`monthly_snapshots`, `monthly_holdings`): Keep **1 year**; then delete and keep **yearly overall**. Export that month's data as CSV before deleting.
+- **Export-before-delete:** For any month being pruned (CC or portfolio), generate and offer download of that month's CSV first, then delete the rows.
 
 - [ ] **9.1 Schema for rollups (Go + Supabase)**
   - [ ] Tables: `monthly_expense_summary` (month, category, total_cents) for CC; `monthly_snapshots` and `monthly_holdings` (Slice 7) for portfolio; `yearly_cc_summary`, `yearly_portfolio_summary` for yearly overall. Populate yearly when pruning monthly after 1 year.
 - [ ] **9.2 CSV export (Go + React)**
-  - [ ] Go: auth-protected endpoint(s) to export a given month’s transactions or snapshot/holdings as CSV (stream or download). Used by retention job and optionally by user (“Export this month”).
-  - [ ] React: button or page to trigger export (e.g. “Export month” or “Export last 12 months”) that calls Go and downloads the file.
+  - [ ] Go: auth-protected endpoint(s) to export a given month's transactions or snapshot/holdings as CSV (stream or download). Used by retention job and optionally by user ("Export this month").
+  - [ ] React: button or page to trigger export (e.g. "Export month" or "Export last 12 months") that calls Go and downloads the file.
 - [ ] **9.3 Retention job (Go)**
-  - [ ] Go: cron-invoked or scheduled job that: (1) **Portfolio daily:** for any month that is older than “previous month” (e.g. when in April, months before March), ensure that month’s daily rows are rolled up: export that month’s daily data to CSV, insert/update monthly_snapshots and monthly_holdings for that month, then delete all daily_snapshots and daily_holdings for that month. So we only keep daily for current + previous month. (2) **CC:** prune transactions older than 3 months (after monthly summary); prune CC monthly older than 1 year (keep yearly). (3) **Portfolio monthly:** prune older than 1 year (keep yearly overall). Export before delete in all cases. Run daily or weekly.
+  - [ ] Go: cron-invoked or scheduled job that: (1) **Portfolio daily:** for any month that is older than "previous month" (e.g. when in April, months before March), ensure that month's daily rows are rolled up: export that month's daily data to CSV, insert/update monthly_snapshots and monthly_holdings for that month, then delete all daily_snapshots and daily_holdings for that month. So we only keep daily for current + previous month. (2) **CC:** prune transactions older than 3 months (after monthly summary); prune CC monthly older than 1 year (keep yearly). (3) **Portfolio monthly:** prune older than 1 year (keep yearly overall). Export before delete in all cases. Run daily or weekly.
 - [ ] **9.4 Document rules**
   - [ ] Document retention rules and export-before-delete in README or runbook.
 
-**Done when:** Each month’s data is exported as CSV before deletion; portfolio daily kept only for current + previous month (older months rolled to monthly); CC daily → 3 months then monthly (1 year) then yearly; portfolio monthly → 1 year then yearly overall; DB stays within free tier.
+**Done when:** Each month's data is exported as CSV before deletion; portfolio daily kept only for current + previous month (older months rolled to monthly); CC daily → 3 months then monthly (1 year) then yearly; portfolio monthly → 1 year then yearly overall; DB stays within free tier.
 
 ---
 
@@ -206,7 +207,7 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 ## Summary
 
 | Slice | Focus |
-|-------|--------|
+|-------|-------|
 | 1 | Repo, app shell, auth |
 | 2 | Link management (Plaid + Snaptrade, status, reconnect) |
 | 3 | Accounts and net worth (current) |

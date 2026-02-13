@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { apiRequest } from '../lib/api'
+import { openSnaptradeConnect } from '../lib/snaptrade'
 
 // Adds callback to handle the Snaptrade connection.
 interface SnaptradeConnectSectionProps {
@@ -9,25 +9,15 @@ interface SnaptradeConnectSectionProps {
 // Connects to Snaptrade and handles the connection.
 export function SnaptradeConnectSection({ onConnected }: SnaptradeConnectSectionProps) {
   const [loading, setLoading] = useState(false)
-  const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   // Opens the Snaptrade Connect URL in a new tab.
   const openConnect = async () => {
     setLoading(true)
     setError(null)
-    setMessage(null)
 
     try {
-      const { redirectUri } = await apiRequest<{ redirectUri: string }>(
-        '/api/snaptrade/connect-url',
-        { method: 'POST' },
-      )
-      window.open(redirectUri, '_blank', 'noopener,noreferrer')
-      setMessage(
-        'Snaptrade Connect opened in a new tab. Complete the flow there, then visit "Manage connections" to see your accounts.',
-      )
-      onConnected?.()
+      await openSnaptradeConnect(onConnected)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to open Snaptrade Connect')
     } finally {
@@ -50,7 +40,6 @@ export function SnaptradeConnectSection({ onConnected }: SnaptradeConnectSection
       >
         {loading ? 'Opening Snaptrade…' : 'Open Snaptrade Connect'}
       </button>
-      {message && <p className="mt-2 text-sm text-green-700">{message}</p>}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
     </div>
   )

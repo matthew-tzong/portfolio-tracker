@@ -35,6 +35,11 @@ type removeSnaptradeConnectionRequest struct {
 	ConnectionID string `json:"connectionId"`
 }
 
+// Reconnect Plaid item request format.
+type reconnectPlaidItemRequest struct {
+	ItemID string `json:"itemId"`
+}
+
 // Link token response format.
 type linkTokenResponse struct {
 	LinkToken string `json:"linkToken"`
@@ -70,6 +75,15 @@ func registerLinkManagementRoutes(mux *http.ServeMux, deps apiDependencies) {
 			return
 		}
 		handleCreatePlaidLinkToken(w, r, deps)
+	})))
+
+	// POST /api/plaid/reconnect-link-token creates a Plaid link token in update mode for reconnecting.
+	mux.Handle("/api/plaid/reconnect-link-token", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			methodNotAllowed(w, http.MethodPost)
+			return
+		}
+		handleCreatePlaidReconnectLinkToken(w, r, deps)
 	})))
 
 	// POST /api/plaid/exchange-token exchanges a Plaid public token for an access token and item ID.
@@ -190,6 +204,12 @@ func handleExchangePlaidPublicToken(w http.ResponseWriter, r *http.Request, deps
 
 	now := time.Now().UTC()
 
+	// Check if an item with the same institution_id already exists (for reconnection).
+	var existingItem *database.PlaidItem
+	if req.InstitutionID != "" {
+		existingItem, _ = deps.db.GetPlaidItemByInstitutionID(r.Context(), req.InstitutionID)
+	}
+
 	// Build the Plaid item for the database.
 	item := &database.PlaidItem{
 		ItemID:      itemID,
@@ -204,7 +224,12 @@ func handleExchangePlaidPublicToken(w http.ResponseWriter, r *http.Request, deps
 		item.InstitutionID = &req.InstitutionID
 	}
 
-	// Save item to DB
+	// If item existed, delete the old item and update accounts to point to the new item_id.
+	if existingItem != nil && existingItem.ItemID != itemID {
+		_ = deps.db.DeletePlaidItem(r.Context(), existingItem.ItemID)
+	}
+
+	// Save item to DB (upsert by item_id)
 	err = deps.db.UpsertPlaidItem(r.Context(), item)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to save Plaid item: "+err.Error())
@@ -230,7 +255,7 @@ func handleExchangePlaidPublicToken(w http.ResponseWriter, r *http.Request, deps
 		dbAccounts = append(dbAccounts, account)
 	}
 
-	// Save accounts to DB
+	// Save accounts to DB, reconnecting will update existing accounts (upsert by account_id)
 	if err := deps.db.UpsertPlaidAccounts(r.Context(), dbAccounts); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to save Plaid accounts: "+err.Error())
 		return
@@ -241,7 +266,7 @@ func handleExchangePlaidPublicToken(w http.ResponseWriter, r *http.Request, deps
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// Lists all Plaid items and Snaptrade connections.
+// Lists all Plaid items and Snaptrade connections from the database.
 func handleListLinks(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -293,21 +318,38 @@ func handleRemovePlaidItem(w http.ResponseWriter, r *http.Request, deps apiDepen
 
 	// Parse the request body.
 	var req removePlaidItemRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil || req.ItemID == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ItemID == "" {
 		writeJSONError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	// Delete the Plaid accounts first, then the item.
-	err = deps.db.DeletePlaidAccountsByItemID(r.Context(), req.ItemID)
+	// Fetch the item from DB to get the access_token.
+	item, err := deps.db.GetPlaidItemByItemID(r.Context(), req.ItemID)
 	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to get Plaid item: "+err.Error())
+		return
+	}
+	if item == nil {
+		writeJSONError(w, http.StatusNotFound, "Plaid item not found")
+		return
+	}
+
+	// Remove the item from Plaid.
+	if deps.plaidClient != nil {
+		if err := deps.plaidClient.RemoveItem(r.Context(), item.AccessToken); err != nil {
+			writeJSONError(w, http.StatusBadGateway, "failed to remove Plaid item: "+err.Error())
+			return
+		}
+	}
+
+	// Delete the item from the database.
+	if err := deps.db.DeletePlaidAccountsByItemID(r.Context(), req.ItemID); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to delete Plaid accounts: "+err.Error())
 		return
 	}
 
-	err = deps.db.DeletePlaidItem(r.Context(), req.ItemID)
-	if err != nil {
+	// Delete the item from the database.
+	if err := deps.db.DeletePlaidItem(r.Context(), req.ItemID); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to delete Plaid item: "+err.Error())
 		return
 	}
@@ -399,14 +441,14 @@ func handleSnaptradeSyncConnections(w http.ResponseWriter, r *http.Request, deps
 		return
 	}
 
-	// Fetch connections from Snaptrade API.
+	// Fetch connections from Snaptrade API and sync to database.
 	conns, err := deps.snaptradeClient.ListConnections(user.UserID, user.UserSecret)
 	if err != nil {
 		writeJSONError(w, http.StatusBadGateway, "failed to list Snaptrade connections: "+err.Error())
 		return
 	}
 
-	// Build DB records and upsert.
+	// Build DB records and upsert
 	now := time.Now().UTC()
 	var dbConns []database.SnaptradeConnection
 	for _, c := range conns {
@@ -449,15 +491,28 @@ func handleRemoveSnaptradeConnection(w http.ResponseWriter, r *http.Request, dep
 
 	// Parse the request body.
 	var req removeSnaptradeConnectionRequest
-	err := json.NewDecoder(r.Body).Decode(&req)
-	if err != nil || req.ConnectionID == "" {
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ConnectionID == "" {
 		writeJSONError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	// Delete the Snaptrade connection.
-	err = deps.db.DeleteSnaptradeConnection(r.Context(), req.ConnectionID)
-	if err != nil {
+	// Delete the connection from Snaptrade first
+	if deps.snaptradeClient != nil {
+		user, err := deps.db.GetSnaptradeUser(r.Context())
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to get Snaptrade user: "+err.Error())
+			return
+		}
+		if user != nil {
+			if err := deps.snaptradeClient.RemoveConnection(user.UserID, user.UserSecret, req.ConnectionID); err != nil {
+				writeJSONError(w, http.StatusBadGateway, "failed to remove Snaptrade connection: "+err.Error())
+				return
+			}
+		}
+	}
+
+	// Delete the connection from our database.
+	if err := deps.db.DeleteSnaptradeConnection(r.Context(), req.ConnectionID); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to delete Snaptrade connection: "+err.Error())
 		return
 	}
@@ -470,6 +525,57 @@ func writeJSONError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	resp := errorResponse{Error: message}
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// Creates a Plaid link token in update mode for reconnecting an existing item.
+func handleCreatePlaidReconnectLinkToken(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if deps.plaidClient == nil {
+		writeJSONError(w, http.StatusInternalServerError, "Plaid is not configured (missing environment variables)")
+		return
+	}
+
+	if deps.db == nil {
+		writeJSONError(w, http.StatusInternalServerError, "Database is not configured")
+		return
+	}
+
+	// Get the authenticated user ID.
+	userID, ok := serverauth.UserIDFromContext(r.Context())
+	if !ok || userID == "" {
+		writeJSONError(w, http.StatusUnauthorized, "missing authenticated user")
+		return
+	}
+
+	// Parse the request body.
+	var req reconnectPlaidItemRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil || req.ItemID == "" {
+		writeJSONError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	// Get the existing item to retrieve its access token.
+	existingItem, err := deps.db.GetPlaidItemByItemID(r.Context(), req.ItemID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to fetch Plaid item: "+err.Error())
+		return
+	}
+	if existingItem == nil {
+		writeJSONError(w, http.StatusNotFound, "Plaid item not found")
+		return
+	}
+
+	// Create a link token in update mode using the existing access token.
+	linkToken, err := deps.plaidClient.CreateLinkTokenWithAccessToken(r.Context(), userID, existingItem.AccessToken)
+	if err != nil {
+		writeJSONError(w, http.StatusBadGateway, "failed to create reconnect link token: "+err.Error())
+		return
+	}
+
+	resp := linkTokenResponse{LinkToken: linkToken}
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
