@@ -41,3 +41,4 @@ Never log or commit `access_token` or API secrets; use env only.
 - **Tests** — Prefer unit tests for categorization, net-worth math, and snapshot logic (mocked Plaid/Snaptrade). Keep tests readable and stable; avoid flaky time-dependent or external calls in core tests, integration tests for API calls?
 - **Structure** — Prefer `app/` for routes and layouts, `components/` for UI, `lib/` for Supabase client, Plaid/Snaptrade clients, and shared logic. Keep `app/api/` routes organized by concern (e.g. `api/webhooks/plaid`, `api/cron/daily-sync`, `api/plaid/exchange-token`).
 - **Refactors** — When adding a feature, leave the codebase easier to understand than before. Extract repeated logic; name new concepts clearly; update types and call sites together.
+- **Type Structs** - All item structs should be put at the bottom of each page.

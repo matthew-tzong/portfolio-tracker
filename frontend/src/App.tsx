@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Auth } from './components/Auth'
 import { Dashboard } from './components/Dashboard'
+import { ExpenseTracker } from './components/ExpenseTracker'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { LinkManagement } from './components/LinkManagement'
 
@@ -10,6 +11,7 @@ Route graph:
  - `/dashboard`: protected main app shell
  - `/`: redirects to `/dashboard` (which will bounce unauthenticated users to `/auth`)
  - `/links`: protected link management page
+ - `/expenses`: protected expense tracker (transactions by month/category)
  */
 function App() {
   return (
@@ -29,6 +31,14 @@ function App() {
           element={
             <ProtectedRoute>
               <LinkManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/expenses"
+          element={
+            <ProtectedRoute>
+              <ExpenseTracker />
             </ProtectedRoute>
           }
         />

@@ -94,6 +94,12 @@ export function Dashboard() {
         <h1 className="text-2xl font-semibold text-gray-900">My portfolio</h1>
         <div className="flex items-center gap-3">
           <Link
+            to="/expenses"
+            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+          >
+            Expense tracker
+          </Link>
+          <Link
             to="/links"
             className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
           >

@@ -68,6 +68,13 @@ func Run() error {
 		snaptradeClient: snaptradeClient,
 	})
 
+	// Registers the transactions and webhook routes.
+	registerTransactionsRoutes(mux, apiDependencies{
+		db:              dbClient,
+		plaidClient:     plaidClient,
+		snaptradeClient: snaptradeClient,
+	})
+
 	handler := withCORS(mux)
 
 	port := getEnv("PORT", "8080")

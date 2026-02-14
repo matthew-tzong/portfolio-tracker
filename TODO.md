@@ -73,21 +73,19 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 **Goal:** Plaid transactions use **webhooks + a conditional end‑of‑day cron**. **Webhooks** are primary: when Plaid notifies us (e.g. via `SYNC_UPDATES_AVAILABLE`) that **new transactions were created for an item that day**, we record that fact. At end of day, a single cron job runs **only if at least one item had new transactions that day**, and then uses cursor‑based `/transactions/sync` to fetch and upsert **all transactions created that day**. Each transaction counts as an expense (category) and feeds overall liabilities. You can view/filter by month and category. Slice 5 uses these categories for monthly budget progress.
 
-- [ ] **4.1 Plaid webhook marks "new transactions today" (Go)**
-  - [ ] Go: webhook `POST /api/webhooks/plaid` — verify signature; on `SYNC_UPDATES_AVAILABLE` (or equivalent) mark the corresponding Plaid item as having **new transactions for "today"** (e.g. record in a small table or flag).
-  - [ ] Each stored transaction is treated as an expense (or credit/refund if positive): contributes to its category and to overall liabilities.
-  - [ ] **Credit card refunds**: Positive transaction amounts on credit cards reduce liabilities (refunds add back to net worth). Negative amounts increase liabilities (expenses).
-- [ ] **4.2 End‑of‑day Plaid sync (Go, in Slice 7 cron)**
-  - [ ] In the nightly cron: **only if** at least one item was marked as "had new transactions today", run cursor‑based `/transactions/sync` for those items and upsert **all transactions created that day**. Clear/reset the "new transactions today" markers after a successful run.
-- [ ] **4.3 Categorization (Go)**
-  - [ ] Store Plaid category on each transaction; map to `categories` or category_resolved so Slice 5 can sum spent per category for the month.
-- [ ] **4.4 Expense tracker UI (React)**
-  - [ ] Go: endpoint to list transactions (e.g. `GET /api/transactions?month=...&category=...`).
-  - [ ] React: page to pick month, filter by category, search; show date, amount, merchant, category; sort by date.
+- [x] **4.1 Plaid webhook marks "new transactions today" (Go)**
+  - [x] Go: webhook `POST /api/webhooks/plaid` — on `SYNC_UPDATES_AVAILABLE` mark the corresponding Plaid item as `new_transactions_pending` (flag on `plaid_items`). Signature verification optional per Plaid docs.
+  - [x] Each stored transaction is treated as an expense (or credit/refund if positive): contributes to its category and to overall liabilities.
+  - [x] **Credit card refunds**: Positive transaction amounts on credit cards reduce liabilities (refunds add back to net worth). Negative amounts increase liabilities (expenses).
+- [x] **4.2 End‑of‑day Plaid sync (Go, in Slice 7 cron)**
+  - [x] Sync logic: `POST /api/transactions/sync` runs cursor‑based `/transactions/sync` for all items with `new_transactions_pending`; upserts added/modified, deletes removed; clears pending and stores cursor. Nightly cron (Slice 7) will call this endpoint.
+- [x] **4.3 Categorization (Go)**
+  - [x] Store Plaid category on each transaction; map to `categories` (by Plaid primary category) so Slice 5 can sum spent per category for the month.
+- [x] **4.4 Expense tracker UI (React)**
+  - [x] Go: `GET /api/transactions?month=...&category=...&search=...`; `GET /api/categories`.
+  - [x] React: Expense tracker page at `/expenses` — pick month, filter by category, search; show date, amount, merchant, category; sort by date; "Sync transactions" button.
 
-**Done when:** Plaid webhook + nightly cron (cursor safety check) keep transactions in sync; they feed expense categories and liabilities; React lists/filters them. Slice 5 uses the same categories for monthly budget.
-
-**Note on credit card payments:** When a credit card bill is paid (transaction from checking account to credit card), we need to avoid double-counting. The Plaid-connected checking account balance will already reflect the outgoing payment; the main concern is not to treat that payment as a *new* expense on top of the already-recorded credit card transactions. Implementation: Detect payment transactions (checking → credit card), treat them as transfers that reduce the credit card liability / clear that billing period's expenses, and ensure they are not counted again as expenses. This logic should be added in Slice 4 or Slice 7 when handling transactions.
+**Done when:** Plaid webhook + nightly cron (cursor safety check) keep transactions in sync; they feed expense categories and liabilities; React lists/filters them. Slice 5 uses the same categories for monthly budget. Credit card payment/transfer detection is implemented in Slice 7.
 
 ---
 
@@ -132,8 +130,10 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
   - [ ] Use a **free** scheduler: **GitHub Actions** or **Vercel Cron**. Call `POST https://<your-go-api>/api/cron/daily-sync` with `CRON_SECRET` at 11pm.
 - [ ] **7.4 API for charts**
   - [ ] Go: endpoint(s) to read daily snapshots/holdings for recent date ranges and monthly for older (for Slice 8).
+- [ ] **7.5 Credit card payment/transfer detection**
+  - [ ] When syncing or using transactions: detect payment transactions (checking → credit card). Treat them as transfers: do not count as expenses (so budget/spent and expense views exclude them; avoids double-counting with the checking-account outflow). Optionally flag or store as transfer type so liabilities/net worth stay correct.
 
-**Done when:** At 11pm, cron runs Plaid cursor safety check + Snaptrade fetch + daily portfolio snapshots; at month-end, monthly rollup is written; daily data is kept for current + previous month, then rolled to monthly (Slice 9).
+**Done when:** At 11pm, cron runs Plaid cursor safety check + Snaptrade fetch + daily portfolio snapshots; at month-end, monthly rollup is written; daily data is kept for current + previous month, then rolled to monthly (Slice 9). Credit card payments are treated as transfers and excluded from expense totals.
 
 ---
 

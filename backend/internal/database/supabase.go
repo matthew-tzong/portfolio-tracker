@@ -439,16 +439,221 @@ func (c *Client) DeleteSnaptradeConnection(ctx context.Context, connID string) e
 	return nil
 }
 
+// Returns all name-based category rules.
+func (c *Client) ListCategoryRules(ctx context.Context) ([]CategoryRule, error) {
+	url := c.restURL("category_rules") + "?order=id.asc"
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list category_rules failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of category rules.
+	var categoryRules []CategoryRule
+	if err := json.NewDecoder(resp.Body).Decode(&categoryRules); err != nil {
+		return nil, err
+	}
+	return categoryRules, nil
+}
+
+// Updates transactions_cursor and new_transactions flag for a Plaid item.
+func (c *Client) UpdatePlaidItemCursorAndPending(ctx context.Context, itemID, cursor string, pending bool) error {
+	payload := map[string]interface{}{
+		"transactions_cursor":      cursor,
+		"new_transactions_pending": pending,
+	}
+
+	// Updates the Plaid item by item_id.
+	url := c.restURL("plaid_items") + "?item_id=eq." + url.QueryEscape(itemID)
+	resp, err := c.doRequest(ctx, http.MethodPatch, url, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase update plaid_item cursor/pending failed: %s", string(body))
+	}
+	return nil
+}
+
+// Sets new_transactions flag for a Plaid item (used by webhook).
+func (c *Client) SetItemNewTransactionsPending(ctx context.Context, itemID string, pending bool) error {
+	payload := map[string]interface{}{"new_transactions_pending": pending}
+	url := c.restURL("plaid_items") + "?item_id=eq." + url.QueryEscape(itemID)
+	resp, err := c.doRequest(ctx, http.MethodPatch, url, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase set new_transactions_pending failed: %s", string(body))
+	}
+	return nil
+}
+
+// Returns all Plaid items that received new transactions.
+func (c *Client) ListPlaidItemsWithPendingTransactions(ctx context.Context) ([]PlaidItem, error) {
+	url := c.restURL("plaid_items") + "?new_transactions_pending=eq.true"
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list plaid_items pending failed: %s", string(body))
+	}
+	var items []PlaidItem
+	if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// Returns all categories.
+func (c *Client) ListCategories(ctx context.Context) ([]Category, error) {
+	url := c.restURL("categories")
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list categories failed: %s", string(body))
+	}
+	var list []Category
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// Upserts transactions by their Plaid_transaction_id.
+func (c *Client) UpsertTransactions(ctx context.Context, txns []Transaction) error {
+	if len(txns) == 0 {
+		return nil
+	}
+	url := c.restURL("transactions") + "?on_conflict=plaid_transaction_id"
+	resp, err := c.doRequest(ctx, http.MethodPost, url, txns)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert transactions failed: %s", string(body))
+	}
+	return nil
+}
+
+// Deletes transactions by their Plaid transaction_id.
+func (c *Client) DeleteTransactionsByPlaidIDs(ctx context.Context, plaidIDs []string) error {
+	if len(plaidIDs) == 0 {
+		return nil
+	}
+	// Constructs the query
+	var b strings.Builder
+	b.WriteString("in.(")
+	for i, id := range plaidIDs {
+		if i > 0 {
+			b.WriteString(",")
+		}
+		escaped := strings.ReplaceAll(id, "\\", "\\\\")
+		escaped = strings.ReplaceAll(escaped, "\"", "\\\"")
+		b.WriteString("\"" + escaped + "\"")
+	}
+	b.WriteString(")")
+
+	// Deletes the transactions
+	url := c.restURL("transactions") + "?plaid_transaction_id=" + url.QueryEscape(b.String())
+	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase delete transactions failed: %s", string(body))
+	}
+	return nil
+}
+
+// Returns transactions for the given month, optionally filtered by category and search.
+func (c *Client) ListTransactions(ctx context.Context, f ListTransactionsFilter) ([]Transaction, error) {
+	// Build query: order by date desc
+	reqURL := c.restURL("transactions") + "?order=date.desc"
+	if f.Month != "" {
+		start := f.Month + "-01"
+		reqURL += "&date=gte." + start + "&date=lte." + endOfMonth(f.Month)
+	}
+	if f.CategoryID != nil {
+		reqURL += "&category_id=eq." + fmt.Sprintf("%d", *f.CategoryID)
+	}
+	if f.Search != "" {
+		pattern := "%" + f.Search + "%"
+		reqURL += "&or=(name.ilike." + url.QueryEscape(pattern) + ",merchant_name.ilike." + url.QueryEscape(pattern) + ")"
+	}
+
+	// Gets the transactions
+	resp, err := c.doRequest(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list transactions failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of transactions.
+	var list []Transaction
+	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
+		return nil, err
+	}
+	return list, nil
+}
+
+// Returns the last day of the month.
+func endOfMonth(month string) string {
+	if len(month) != 7 {
+		return month + "-31"
+	}
+	parts := strings.Split(month, "-")
+	if len(parts) != 2 {
+		return month + "-31"
+	}
+	var y, m int
+	if _, err := fmt.Sscanf(parts[0], "%d", &y); err != nil {
+		return month + "-31"
+	}
+	if _, err := fmt.Sscanf(parts[1], "%d", &m); err != nil {
+		return month + "-31"
+	}
+	// Adds one month and subtracts one day to get the last day of the month.
+	t := time.Date(y, time.Month(m), 1, 0, 0, 0, 0, time.UTC)
+	t = t.AddDate(0, 1, -1)
+	return t.Format("2006-01-02")
+}
+
 // Represents a row in the plaid_items table.
 type PlaidItem struct {
-	ID              int64     `json:"id,omitempty"`
-	ItemID          string    `json:"item_id"`
-	AccessToken     string    `json:"access_token"`
-	InstitutionID   *string   `json:"institution_id,omitempty"`
-	InstitutionName *string   `json:"institution_name,omitempty"`
-	Status          string    `json:"status"`
-	LastUpdated     time.Time `json:"last_updated"`
-	CreatedAt       time.Time `json:"created_at,omitempty"`
+	ID                     int64     `json:"id,omitempty"`
+	ItemID                 string    `json:"item_id"`
+	AccessToken            string    `json:"access_token"`
+	InstitutionID          *string   `json:"institution_id,omitempty"`
+	InstitutionName        *string   `json:"institution_name,omitempty"`
+	Status                 string    `json:"status"`
+	LastUpdated            time.Time `json:"last_updated"`
+	CreatedAt              time.Time `json:"created_at,omitempty"`
+	TransactionsCursor     *string   `json:"transactions_cursor,omitempty"`
+	NewTransactionsPending bool      `json:"new_transactions_pending"`
 }
 
 // The JSON-safe representation for API responses (hides access_token).
@@ -493,4 +698,41 @@ type SnaptradeConnectionJSON struct {
 	Brokerage  string     `json:"brokerage"`
 	Status     string     `json:"status"`
 	LastSynced *time.Time `json:"lastSynced,omitempty"`
+}
+
+// Represents a row in the categories table.
+type Category struct {
+	ID        int64   `json:"id,omitempty"`
+	Name      string  `json:"name"`
+	PlaidName *string `json:"plaid_name,omitempty"`
+	Expense   bool    `json:"expense"`
+}
+
+// Category rule maps transaction name/merchant substring to a category.
+type CategoryRule struct {
+	ID          int64  `json:"id,omitempty"`
+	MatchString string `json:"match_string"`
+	CategoryID  int64  `json:"category_id"`
+}
+
+// Represents a row in the transactions table.
+type Transaction struct {
+	ID                 int64     `json:"id,omitempty"`
+	PlaidAccountID     string    `json:"plaid_account_id"`
+	PlaidTransactionID string    `json:"plaid_transaction_id"`
+	Date               time.Time `json:"date"`
+	AmountCents        int64     `json:"amount_cents"`
+	Name               string    `json:"name"`
+	MerchantName       *string   `json:"merchant_name,omitempty"`
+	CategoryID         *int64    `json:"category_id,omitempty"`
+	Pending            bool      `json:"pending"`
+	CreatedAt          time.Time `json:"created_at,omitempty"`
+	UpdatedAt          time.Time `json:"updated_at,omitempty"`
+}
+
+// Holds optional filters for listing transactions.
+type ListTransactionsFilter struct {
+	Month      string
+	CategoryID *int64
+	Search     string
 }

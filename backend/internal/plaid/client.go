@@ -12,14 +12,6 @@ import (
 	"time"
 )
 
-// Plaid API Client
-type Client struct {
-	httpClient *http.Client
-	baseURL    string
-	clientID   string
-	secret     string
-}
-
 // Constructs a Plaid client from environment variables.
 func NewClientFromEnv() (*Client, error) {
 	clientID := os.Getenv("PLAID_CLIENT_ID")
@@ -196,6 +188,56 @@ func (c *Client) postJSON(ctx context.Context, path string, input, output interf
 	return nil
 }
 
+// Error Interface for PlaidConnectionError.
+func (e *PlaidConnectionError) Error() string {
+	return fmt.Sprintf("plaid API error: %s (%s)", e.ErrorMessage, e.ErrorCode)
+}
+
+// Determines if a Plaid error code indicates authentication/reconnection is needed.
+func isPlaidAuthError(errorCode string) bool {
+	authErrorCodes := []string{
+		"ITEM_LOGIN_REQUIRED",
+		"INVALID_ACCESS_TOKEN",
+		"ACCESS_TOKEN_EXPIRED",
+		"ACCESS_TOKEN_INVALID",
+	}
+	return slices.Contains(authErrorCodes, errorCode)
+}
+
+// Syncs transactions for a given Plaid item and cursor.
+func (c *Client) TransactionsSync(ctx context.Context, accessToken, cursor string) (*TransactionsSyncResult, error) {
+	// Constructs request body and sets cursor
+	reqBody := transactionsSyncRequest{
+		ClientID:    c.clientID,
+		Secret:      c.secret,
+		AccessToken: accessToken,
+	}
+
+	if cursor != "" {
+		reqBody.Cursor = &cursor
+	}
+
+	var resp transactionsSyncResponse
+	if err := c.postJSON(ctx, "/transactions/sync", reqBody, &resp); err != nil {
+		return nil, err
+	}
+	return &TransactionsSyncResult{
+		Added:      resp.Added,
+		Modified:   resp.Modified,
+		Removed:    resp.Removed,
+		NextCursor: resp.NextCursor,
+		HasMore:    resp.HasMore,
+	}, nil
+}
+
+// Plaid API Client
+type Client struct {
+	httpClient *http.Client
+	baseURL    string
+	clientID   string
+	secret     string
+}
+
 // Request body for creating a Plaid Link token.
 type linkTokenCreateRequest struct {
 	ClientID     string        `json:"client_id"`
@@ -285,22 +327,6 @@ type PlaidConnectionError struct {
 	IsAuthError  bool
 }
 
-// Error Interface for PlaidConnectionError.
-func (e *PlaidConnectionError) Error() string {
-	return fmt.Sprintf("plaid API error: %s (%s)", e.ErrorMessage, e.ErrorCode)
-}
-
-// Determines if a Plaid error code indicates authentication/reconnection is needed.
-func isPlaidAuthError(errorCode string) bool {
-	authErrorCodes := []string{
-		"ITEM_LOGIN_REQUIRED",
-		"INVALID_ACCESS_TOKEN",
-		"ACCESS_TOKEN_EXPIRED",
-		"ACCESS_TOKEN_INVALID",
-	}
-	return slices.Contains(authErrorCodes, errorCode)
-}
-
 // Plaid item status information.
 type ItemStatus struct {
 	ItemID                string  `json:"item_id"`
@@ -323,4 +349,48 @@ type itemRemoveRequest struct {
 // Response body for removing a Plaid item.
 type itemRemoveResponse struct {
 	RequestID string `json:"request_id"`
+}
+
+// Results from transactions sync.
+type TransactionsSyncResult struct {
+	Added      []PlaidTransaction
+	Modified   []PlaidTransaction
+	Removed    []RemovedTransaction
+	NextCursor string
+	HasMore    bool
+}
+
+// Transaction for transactions sync.
+type PlaidTransaction struct {
+	TransactionID string   `json:"transaction_id"`
+	AccountID     string   `json:"account_id"`
+	Amount        float64  `json:"amount"`
+	Date          string   `json:"date"`
+	Name          string   `json:"name"`
+	MerchantName  *string  `json:"merchant_name,omitempty"`
+	Category      []string `json:"category,omitempty"`
+	CategoryID    *string  `json:"category_id,omitempty"`
+	Pending       bool     `json:"pending"`
+}
+
+// Removed transaction for transactions sync.
+type RemovedTransaction struct {
+	TransactionID string `json:"transaction_id"`
+}
+
+// Request body for transactions sync.
+type transactionsSyncRequest struct {
+	ClientID    string  `json:"client_id"`
+	Secret      string  `json:"secret"`
+	AccessToken string  `json:"access_token"`
+	Cursor      *string `json:"cursor,omitempty"`
+}
+
+// Response body for transactions sync.
+type transactionsSyncResponse struct {
+	Added      []PlaidTransaction   `json:"added"`
+	Modified   []PlaidTransaction   `json:"modified"`
+	Removed    []RemovedTransaction `json:"removed"`
+	NextCursor string               `json:"next_cursor"`
+	HasMore    bool                 `json:"has_more"`
 }
