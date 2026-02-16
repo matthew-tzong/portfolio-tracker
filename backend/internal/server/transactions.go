@@ -35,6 +35,9 @@ func registerTransactionsRoutes(mux *http.ServeMux, deps apiDependencies) {
 	mux.Handle("/api/categories", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handleListCategories(w, r, deps)
 	})))
+	mux.Handle("/api/budget", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handleBudget(w, r, deps)
+	})))
 }
 
 // Handles Plaid webhook for transaction sync updates.
@@ -407,6 +410,141 @@ func handleListCategories(w http.ResponseWriter, r *http.Request, deps apiDepend
 	}
 }
 
+// Returns or updates the current budget.
+func handleBudget(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
+	if deps.db == nil {
+		writeJSONError(w, http.StatusInternalServerError, "database not configured")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		handleGetBudget(w, r, deps)
+	case http.MethodPost, http.MethodPut:
+		handleUpdateBudget(w, r, deps)
+	default:
+		methodNotAllowed(w, http.MethodGet)
+	}
+}
+
+// Returns the budget allocations and spent-by-category for the requested month.
+func handleGetBudget(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
+	w.Header().Set("Content-Type", "application/json")
+
+	month := r.URL.Query().Get("month")
+	if month == "" {
+		writeJSONError(w, http.StatusBadRequest, "month required (YYYY-MM)")
+		return
+	}
+
+	// Load the current budget
+	budget, err := deps.db.GetBudget(r.Context())
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Maps the allocations to a map.
+	allocations := map[string]int64{}
+	if budget != nil && budget.Allocations != nil {
+		for k, v := range budget.Allocations {
+			allocations[k] = v
+		}
+	}
+
+	// Computes the monthly spent by category.
+	spendingMap, err := calculateMonthlySpentByCategory(r.Context(), deps.db, month)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Returns the response.
+	resp := budgetResponse{
+		Month:       month,
+		Allocations: allocations,
+		Spent:       spendingMap,
+	}
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		log.Printf("get budget encode: %v", err)
+	}
+}
+
+// Updates the budget allocations.
+func handleUpdateBudget(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
+	w.Header().Set("Content-Type", "application/json")
+
+	// Decodes the request body into an updateBudgetRequest.
+	var req updateBudgetRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+
+	// Sets the allocations to an empty map if nil.
+	if req.Allocations == nil {
+		req.Allocations = map[string]int64{}
+	}
+
+	// Creates the new budget.
+	budget := &database.Budget{
+		ID:          1,
+		Allocations: req.Allocations,
+	}
+
+	if err := deps.db.UpsertBudget(r.Context(), budget); err != nil {
+		writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Return the updated budget
+	err := json.NewEncoder(w).Encode(budget)
+	if err != nil {
+		log.Printf("update budget encode: %v", err)
+	}
+}
+
+// Computes the monthly spent by category.
+func calculateMonthlySpentByCategory(ctx context.Context, dbClient *database.Client, month string) (map[string]int64, error) {
+	monthlySpending := make(map[string]int64)
+	if month == "" {
+		return monthlySpending, nil
+	}
+	if dbClient == nil {
+		return monthlySpending, nil
+	}
+
+	// Fetch transactions for the month.
+	transactions, err := dbClient.ListTransactions(ctx, database.ListTransactionsFilter{Month: month})
+	if err != nil {
+		return nil, err
+	}
+
+	// Fetches and filters to expense categories.
+	categories, err := dbClient.ListCategories(ctx)
+	if err != nil {
+		return nil, err
+	}
+	expenseCategoryIDs := make(map[int64]bool)
+	for _, category := range categories {
+		if category.Expense {
+			expenseCategoryIDs[category.ID] = true
+		}
+	}
+
+	// Computes the monthly spent by category.
+	for _, transaction := range transactions {
+		categoryID := *transaction.CategoryID
+		if !expenseCategoryIDs[categoryID] {
+			continue
+		}
+		categoryName := categories[categoryID].Name
+		monthlySpending[categoryName] += transaction.AmountCents
+	}
+	return monthlySpending, nil
+}
+
 // Category for API.
 type categoryJSON struct {
 	ID      int64  `json:"id"`
@@ -443,4 +581,16 @@ type transactionsSummaryResponse struct {
 	IncomeCents   int64 `json:"incomeCents"`
 	ExpensesCents int64 `json:"expensesCents"`
 	InvestedCents int64 `json:"investedCents"`
+}
+
+// Budget API response
+type budgetResponse struct {
+	Month       string           `json:"month"`
+	Allocations map[string]int64 `json:"allocations"`
+	Spent       map[string]int64 `json:"spent"`
+}
+
+// Budget update request
+type updateBudgetRequest struct {
+	Allocations map[string]int64 `json:"allocations"`
 }

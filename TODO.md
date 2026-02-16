@@ -91,14 +91,18 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 ## Slice 5: Budget tracker
 
-**Goal:** Set a monthly budget by category and see progress (spent vs budget) using expense data.
+**Goal:** Set a budget by category and see progress (spent vs budget) using expense data. The budget is **global** (same for all months) until manually changed; the month selector only changes the "spent" side.
 
-- [ ] **5.1 Budget model and API (Go)**
-  - [ ] Supabase: table `budgets` (month, allocations jsonb). Go: endpoints to create/update and read budget for a month; helper to compute "spent per category" from `transactions` for that month.
-- [ ] **5.2 Budget UI (React)**
-  - [ ] Page: pick month; set budget per category (form); fetch budget and spent-from-Go. Show progress (bar or %) per category; highlight over-budget.
+- [x] **5.1 Budget model and API (Go)**
+  - [x] Supabase: table `budgets` with a single global row (`id = 1`, `allocations jsonb`, `updated_at`). Go: `GetBudget` / `UpsertBudget` helpers plus endpoints:
+    - [x] `GET /api/budget?month=YYYY-MM` — returns global allocations and "spent per category" for that month, computed from `transactions` (expense categories only, including `Uncategorized`).
+    - [x] `PUT /api/budget` — updates the global budget allocations.
+- [x] **5.2 Budget UI (React)**
+  - [x] Page at `/budget`: pick month; set budget per category (form); fetch budget and spent-from-Go. Shows per-category budget, spent, and remaining, with over-budget categories highlighted.
+  - [x] Includes a "Total monthly budget" input; per-category allocations must sum exactly to this total before the budget is saved. If not, the save is rejected with a clear "invalid allocations" message.
+  - [x] Every expense category always has an explicit allocation (at least 0); clearing a field sets the allocation to 0 rather than removing it. Footer summary shows total budgeted, total spent for the month, and total remaining across all categories.
 
-**Done when:** You can create/edit a monthly budget via React and see spent vs budget per category (data from Go API).
+**Done when:** You can create/edit the global budget via React, allocations are validated against the total budget, and you can see spent vs budget per category (and overall) for any month using data from the Go API.
 
 ---
 
@@ -148,7 +152,7 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 - [ ] **8.3 Per-stock and per-account performance over time (React)**
   - [ ] For chosen symbol or account, fetch daily holdings for recent months and monthly for older from Go; chart value over time.
 - [ ] **8.4 Expenses by category (React)**
-  - [ ] By month: fetch aggregated-by-category from Go; bar or donut chart.
+  - [ ] By month: fetch aggregated-by-category from Go; Pie chart with percentages shown.
 - [ ] **8.5 Budget progress (React)**
   - [ ] Per category: bar or donut showing spent vs budget for selected month (data from Go).
 - [ ] **8.6 Dashboard integration**

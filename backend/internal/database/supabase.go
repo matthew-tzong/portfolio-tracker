@@ -642,6 +642,52 @@ func endOfMonth(month string) string {
 	return t.Format("2006-01-02")
 }
 
+// Returns the current budget.
+func (c *Client) GetBudget(ctx context.Context) (*Budget, error) {
+	url := c.restURL("budgets") + "?id=eq.1&limit=1"
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase get budget failed: %s", string(body))
+	}
+
+	// Decodes the response body into a Budget slice
+	var budgets []Budget
+	if err := json.NewDecoder(resp.Body).Decode(&budgets); err != nil {
+		return nil, err
+	}
+	if len(budgets) == 0 {
+		return nil, nil
+	}
+	return &budgets[0], nil
+}
+
+// Inserts or updates the current budget.
+func (c *Client) UpsertBudget(ctx context.Context, budget *Budget) error {
+	if budget == nil {
+		return errors.New("budget is nil")
+	}
+
+	url := c.restURL("budgets") + "?on_conflict=id"
+	resp, err := c.doRequest(ctx, http.MethodPost, url, budget)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert budget failed: %s", string(body))
+	}
+	return nil
+}
+
 // Represents a row in the plaid_items table.
 type PlaidItem struct {
 	ID                     int64     `json:"id,omitempty"`
@@ -735,4 +781,11 @@ type ListTransactionsFilter struct {
 	Month      string
 	CategoryID *int64
 	Search     string
+}
+
+// Represents a row in the budgets table.
+type Budget struct {
+	ID          int64            `json:"id,omitempty"`
+	Allocations map[string]int64 `json:"allocations"`
+	UpdatedAt   time.Time        `json:"updated_at,omitempty"`
 }

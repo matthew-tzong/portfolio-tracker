@@ -4,6 +4,7 @@ import { Dashboard } from './components/Dashboard'
 import { ExpenseTracker } from './components/ExpenseTracker'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { LinkManagement } from './components/LinkManagement'
+import { BudgetTracker } from './components/BudgetTracker'
 
 /**
 Route graph:
@@ -12,6 +13,7 @@ Route graph:
  - `/`: redirects to `/dashboard` (which will bounce unauthenticated users to `/auth`)
  - `/links`: protected link management page
  - `/expenses`: protected expense tracker (transactions by month/category)
+ - `/budget`: protected budget tracker (global budgets, monthly spent vs budget)
  */
 function App() {
   return (
@@ -39,6 +41,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ExpenseTracker />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/budget"
+          element={
+            <ProtectedRoute>
+              <BudgetTracker />
             </ProtectedRoute>
           }
         />

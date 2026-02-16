@@ -100,6 +100,12 @@ export function Dashboard() {
             Expense tracker
           </Link>
           <Link
+            to="/budget"
+            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
+          >
+            Budget tracker
+          </Link>
+          <Link
             to="/links"
             className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
           >
