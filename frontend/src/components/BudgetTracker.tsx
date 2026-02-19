@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiRequest } from '../lib/api'
+import { BudgetBarChart } from './BudgetBarChart'
 
 // Category types.
 interface Category {
@@ -106,6 +107,22 @@ export function BudgetTracker() {
     monthOptions.push(`${year}-${m}`)
     day.setMonth(day.getMonth() - 1)
   }
+
+  // Builds data for budget vs spent chart.
+  const budgetChartData = useMemo(() => {
+    return categories
+      .filter((c) => c.expense)
+      .map((category) => {
+        const key = String(category.id)
+        const allocatedCents = allocations[key] ?? 0
+        const spentCents = spent[key] ?? 0
+        return {
+          name: category.name,
+          budget: allocatedCents / 100,
+          spent: spentCents / 100,
+        }
+      })
+  }, [allocations, categories, spent])
 
   // Handles budget change for a category (value is in dollars).
   const handleAllocationChange = (categoryId: number, value: string) => {
@@ -245,6 +262,12 @@ export function BudgetTracker() {
           <p className="text-sm text-gray-600">Loading budget…</p>
         ) : (
           <>
+            <div className="mb-6">
+              <BudgetBarChart
+                title={`Budget vs spent by category (${month})`}
+                data={budgetChartData}
+              />
+            </div>
             <div className="overflow-hidden rounded-md border border-gray-200">
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">

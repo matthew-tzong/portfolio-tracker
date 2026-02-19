@@ -138,8 +138,8 @@ export function LinkManagement() {
     }
   }
 
-    // Returns the link management page.
-    return (
+  // Returns the link management page.
+  return (
     <div className="max-w-4xl mx-auto py-8 px-5">
       <h1 className="text-2xl font-semibold text-gray-900 mb-2">Connections</h1>
       <p className="text-sm text-gray-600 mb-4">

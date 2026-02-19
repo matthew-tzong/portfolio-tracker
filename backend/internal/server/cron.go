@@ -40,7 +40,7 @@ func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencie
 	if headerSecret != cronSecret {
 		writeJSONError(w, http.StatusUnauthorized, "invalid cron secret")
 		return
-	}	
+	}
 
 	// Update connection statuses for Plaid and Snaptrade.
 	_ = checkAndUpdatePlaidItemStatuses(r.Context(), deps.db, deps.plaidClient)

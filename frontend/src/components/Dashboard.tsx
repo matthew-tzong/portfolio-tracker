@@ -73,7 +73,7 @@ export function Dashboard() {
     }).format(cents / 100)
 
   // Returns the dashboard page.
-    return (
+  return (
     <div className="max-w-3xl mx-auto py-8 px-5">
       <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
 

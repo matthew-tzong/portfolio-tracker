@@ -242,7 +242,7 @@ func handleGetTransactionsSummary(w http.ResponseWriter, r *http.Request, deps a
 		return
 	}
 
-    // Calculates the income, expenses, and invested amounts.
+	// Calculates the income, expenses, and invested amounts.
 	var investmentsID, transferCategoryID int64
 	expenseCategoryIDs := make(map[int64]bool)
 	for _, category := range categories {
@@ -541,14 +541,14 @@ func calculateMonthlySpentByCategory(ctx context.Context, dbClient *database.Cli
 		}
 	}
 
-    // Loops through the transactions and calculates the monthly spent by category.
+	// Loops through the transactions and calculates the monthly spent by category.
 	for _, transaction := range transactions {
 		categoryID := *transaction.CategoryID
 		if !expenseCategoryIDs[categoryID] {
 			continue
 		}
 		categoryName := categories[categoryID].Name
-        monthlySpending[categoryName] += transaction.AmountCents
+		monthlySpending[categoryName] += transaction.AmountCents
 	}
 	return monthlySpending, nil
 }

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { apiRequest } from '../lib/api'
+import { CategoryPieChart } from './CategoryPieChart'
 
 // Category types.
 interface Category {
@@ -149,6 +150,26 @@ export function ExpenseTracker() {
     day.setMonth(day.getMonth() - 1)
   }
 
+  // Aggregates expenses by category
+  const categoryBreakdown = useMemo(() => {
+    if (!transactions.length) {
+      return []
+    }
+    const totalsByCategory: Record<string, number> = {}
+    transactions.forEach((transaction) => {
+      if (transaction.amountCents >= 0) {
+        return
+      }
+      const categoryName = transaction.categoryName || 'Uncategorized'
+      totalsByCategory[categoryName] =
+        (totalsByCategory[categoryName] ?? 0) + Math.abs(transaction.amountCents)
+    })
+    return Object.entries(totalsByCategory).map(([name, valueCents]) => ({
+      name,
+      value: valueCents / 100,
+    }))
+  }, [transactions])
+
   // Returns the expense tracker page.
   return (
     <div className="max-w-4xl mx-auto py-8 px-5">
@@ -235,6 +256,12 @@ export function ExpenseTracker() {
             ) : (
               <p className="text-sm text-gray-500">No summary for this month.</p>
             )}
+          </div>
+        )}
+
+        {month && (
+          <div className="mb-6">
+            <CategoryPieChart title={`Expenses by category (${month})`} data={categoryBreakdown} />
           </div>
         )}
 
