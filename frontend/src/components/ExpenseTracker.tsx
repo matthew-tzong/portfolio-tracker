@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { apiRequest } from '../lib/api'
-import { supabase } from '../lib/supabase'
 
 // Category types.
 interface Category {
@@ -48,7 +46,6 @@ function currentMonth(): string {
 }
 
 export function ExpenseTracker() {
-  const [user, setUser] = useState<{ email?: string } | null>(null)
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [month, setMonth] = useState(currentMonth())
@@ -58,11 +55,6 @@ export function ExpenseTracker() {
   const [summary, setSummary] = useState<TransactionsSummaryResponse | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  // Loads the user from Supabase.
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
-  }, [])
 
   // Loads the categories from the backend.
   const loadCategories = useCallback(async () => {
@@ -139,11 +131,6 @@ export function ExpenseTracker() {
     void loadSummary()
   }, [loadSummary])
 
-  // Handles sign out.
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-  }
-
   // Formats the currency.
   const formatCurrency = (cents: number) =>
     new Intl.NumberFormat('en-US', {
@@ -162,34 +149,10 @@ export function ExpenseTracker() {
     day.setMonth(day.getMonth() - 1)
   }
 
-  // Returns the expense tracker.
+  // Returns the expense tracker page.
   return (
-    <div className="max-w-4xl mx-auto py-12 px-5">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">Expense tracker</h1>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/dashboard"
-            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/links"
-            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Manage connections
-          </Link>
-          <button
-            onClick={handleSignOut}
-            className="py-2 px-4 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-
-      <p className="text-gray-600 mb-6">Signed in as {user?.email ?? '...'}</p>
+    <div className="max-w-4xl mx-auto py-8 px-5">
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Expense tracker</h1>
 
       <div className="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="flex flex-wrap items-end gap-4 mb-4">

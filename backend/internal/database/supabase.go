@@ -688,6 +688,216 @@ func (c *Client) UpsertBudget(ctx context.Context, budget *Budget) error {
 	return nil
 }
 
+// Inserts or updates a daily snapshot.
+func (c *Client) UpsertDailySnapshot(ctx context.Context, snapshot *DailySnapshot) error {
+	if snapshot == nil {
+		return errors.New("snapshot is nil")
+	}
+
+	url := c.restURL("daily_snapshots") + "?on_conflict=date"
+	resp, err := c.doRequest(ctx, http.MethodPost, url, snapshot)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert daily_snapshots failed: %s", string(body))
+	}
+	return nil
+}
+
+// Lists daily snapshots within a date range (should be for last 30 days).
+func (c *Client) ListDailySnapshots(ctx context.Context, startDate, endDate time.Time) ([]DailySnapshot, error) {
+	startStr := startDate.Format("2006-01-02")
+	endStr := endDate.Format("2006-01-02")
+	url := c.restURL("daily_snapshots") + fmt.Sprintf("?date=gte.%s&date=lte.%s&order=date.asc", startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list daily_snapshots failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of daily snapshots.
+	var snapshots []DailySnapshot
+	err = json.NewDecoder(resp.Body).Decode(&snapshots)
+	if err != nil {
+		return nil, err
+	}
+	return snapshots, nil
+}
+
+// Inserts or updates a daily holding.
+func (c *Client) UpsertDailyHolding(ctx context.Context, holding *DailyHolding) error {
+	if holding == nil {
+		return errors.New("holding is nil")
+	}
+
+	url := c.restURL("daily_holdings") + "?on_conflict=date,account_id,symbol"
+	resp, err := c.doRequest(ctx, http.MethodPost, url, holding)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert daily_holdings failed: %s", string(body))
+	}
+	return nil
+}
+
+// Lists daily holdings within a date range (should be for last 30 days).
+func (c *Client) ListDailyHoldings(ctx context.Context, startDate, endDate time.Time) ([]DailyHolding, error) {
+	startStr := startDate.Format("2006-01-02")
+	endStr := endDate.Format("2006-01-02")
+	url := c.restURL("daily_holdings") + fmt.Sprintf("?date=gte.%s&date=lte.%s&order=date.asc", startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list daily_holdings failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of daily holdings.
+	var holdings []DailyHolding
+	if err := json.NewDecoder(resp.Body).Decode(&holdings); err != nil {
+		return nil, err
+	}
+	return holdings, nil
+}
+
+// Lists daily holdings for a specific account (should be for last 30 days).
+func (c *Client) ListDailyHoldingsByAccount(ctx context.Context, accountID string, startDate, endDate time.Time) ([]DailyHolding, error) {
+	startStr := startDate.Format("2006-01-02")
+	endStr := endDate.Format("2006-01-02")
+	url := c.restURL("daily_holdings") + fmt.Sprintf("?account_id=eq.%s&date=gte.%s&date=lte.%s&order=date.asc", accountID, startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list daily_holdings by account failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of daily holdings.
+	var holdings []DailyHolding
+	err = json.NewDecoder(resp.Body).Decode(&holdings)
+	if err != nil {
+		return nil, err
+	}
+	return holdings, nil
+}
+
+// Lists daily holdings for a specific symbol (should be for last 30 days).
+func (c *Client) ListDailyHoldingsBySymbol(ctx context.Context, symbol string, startDate, endDate time.Time) ([]DailyHolding, error) {
+	startStr := startDate.Format("2006-01-02")
+	endStr := endDate.Format("2006-01-02")
+	url := c.restURL("daily_holdings") + fmt.Sprintf("?symbol=eq.%s&date=gte.%s&date=lte.%s&order=date.asc", symbol, startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list daily_holdings by symbol failed: %s", string(body))
+	}
+
+	var holdings []DailyHolding
+	if err := json.NewDecoder(resp.Body).Decode(&holdings); err != nil {
+		return nil, err
+	}
+	return holdings, nil
+}
+
+// Inserts or updates a monthly snapshot.
+func (c *Client) UpsertMonthlySnapshot(ctx context.Context, snapshot *MonthlySnapshot) error {
+	if snapshot == nil {
+		return errors.New("snapshot is nil")
+	}
+
+	url := c.restURL("monthly_snapshots") + "?on_conflict=month,account_id"
+	resp, err := c.doRequest(ctx, http.MethodPost, url, snapshot)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert monthly_snapshots failed: %s", string(body))
+	}
+	return nil
+}
+
+// Lists monthly snapshots within a month range.
+func (c *Client) ListMonthlySnapshots(ctx context.Context, startMonth, endMonth time.Time) ([]MonthlySnapshot, error) {
+	startStr := startMonth.Format("2006-01-02")
+	endStr := endMonth.Format("2006-01-02")
+	url := c.restURL("monthly_snapshots") + fmt.Sprintf("?month=gte.%s&month=lte.%s&order=month.asc", startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list monthly_snapshots failed: %s", string(body))
+	}
+
+	var snapshots []MonthlySnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snapshots); err != nil {
+		return nil, err
+	}
+	return snapshots, nil
+}
+
+// Lists monthly snapshots for a single account within a month range.
+func (c *Client) ListMonthlySnapshotsByAccount(ctx context.Context, startMonth, endMonth time.Time, accountID string) ([]MonthlySnapshot, error) {
+	startStr := startMonth.Format("2006-01-02")
+	endStr := endMonth.Format("2006-01-02")
+	url := c.restURL("monthly_snapshots") + fmt.Sprintf("?account_id=eq.%s&month=gte.%s&month=lte.%s&order=month.asc",
+		url.QueryEscape(accountID), startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list monthly_snapshots by account failed: %s", string(body))
+	}
+
+	var snapshots []MonthlySnapshot
+	if err := json.NewDecoder(resp.Body).Decode(&snapshots); err != nil {
+		return nil, err
+	}
+	return snapshots, nil
+}
+
 // Represents a row in the plaid_items table.
 type PlaidItem struct {
 	ID                     int64     `json:"id,omitempty"`
@@ -788,4 +998,32 @@ type Budget struct {
 	ID          int64            `json:"id,omitempty"`
 	Allocations map[string]int64 `json:"allocations"`
 	UpdatedAt   time.Time        `json:"updated_at,omitempty"`
+}
+
+// Represents a row in the daily_snapshots table
+type DailySnapshot struct {
+	ID                  int64     `json:"id,omitempty"`
+	Date                time.Time `json:"date"`
+	PortfolioValueCents int64     `json:"portfolio_value_cents"`
+	CreatedAt           time.Time `json:"created_at,omitempty"`
+}
+
+// Represents a row in the daily_holdings table.
+type DailyHolding struct {
+	ID         int64     `json:"id,omitempty"`
+	Date       time.Time `json:"date"`
+	AccountID  string    `json:"account_id"`
+	Symbol     string    `json:"symbol"`
+	Quantity   float64   `json:"quantity"`
+	ValueCents int64     `json:"value_cents"`
+	CreatedAt  time.Time `json:"created_at,omitempty"`
+}
+
+// Represents a row in the monthly_snapshots table.
+type MonthlySnapshot struct {
+	ID                  int64     `json:"id,omitempty"`
+	Month               time.Time `json:"month"`
+	AccountID           string    `json:"account_id"`
+	PortfolioValueCents int64     `json:"portfolio_value_cents"`
+	CreatedAt           time.Time `json:"created_at,omitempty"`
 }

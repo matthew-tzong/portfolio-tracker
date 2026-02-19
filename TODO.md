@@ -108,36 +108,47 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 ## Slice 6: Portfolio view (holdings, daily + monthly history)
 
-**Goal:** See Fidelity (Snaptrade) positions (live) and **daily** portfolio snapshots for recent time (current month + previous month), and **monthly** values for older months. Example: in April we store all daily snapshots for March and April, and only monthly data for January and February. After a month ends, we delete that month's daily rows and keep only its monthly value (Slice 9).
+**Goal:** See **investment portfolio only** (Snaptrade/Fidelity) positions (live) and **daily** portfolio value for the **last 30 days**, plus **monthly per‑account** values for rolled‑off months (end‑of‑month snapshots). Daily data is investments only (no net worth/liabilities); monthly is stored per account and summed for totals.
 
-- [ ] **6.1 Current holdings (Go + Snaptrade)**
-  - [ ] Go: fetch Snaptrade positions per account (symbol, quantity, value); endpoint to return current holdings and account totals for the portfolio UI.
-- [ ] **6.2 Daily and monthly portfolio data (Go + Supabase)**
-  - [ ] Supabase: `daily_snapshots` (date, net_worth_cents, portfolio_value_cents, cash_cents, liabilities_cents) and `daily_holdings` (date, account_id, symbol, quantity, value_cents) for recent months; `monthly_snapshots` and `monthly_holdings` for older months (after daily for that month is deleted and rolled up).
-  - [ ] Go: endpoints to return (1) daily series for date ranges where we have daily data (current + previous month), (2) monthly series for older months; net worth, portfolio value, per-account, per-symbol.
-- [ ] **6.3 Portfolio UI (React)**
-  - [ ] Page: current positions from Go (live Snaptrade); charts show **daily** portfolio/net worth for recent months and **monthly** for older months (per stock, per account, overall).
+- [x] **6.1 Current holdings (Go + Snaptrade)**
+  - [x] Go: fetch Snaptrade positions per account (symbol, quantity, value) via the official Snaptrade Go SDK; expose an endpoint that returns current holdings with `accountId`, `accountName`, `symbol`, `quantity`, and `valueCents`. The frontend derives account totals and overall total from this response.
+- [x] **6.2 Daily and monthly portfolio data (Go + Supabase)**
+  - [x] Supabase: `daily_snapshots` (date, `portfolio_value_cents`, **investments only**), `daily_holdings` (date, account_id, symbol, quantity, value_cents) for **last 30 days**; `monthly_snapshots` (month, account_id, portfolio_value_cents) for rolled‑off months (no `monthly_holdings` table).
+  - [x] Go: endpoints to return:
+    - Daily total portfolio series (last 30 days) and monthly total series (older months) by aggregating `monthly_snapshots` across accounts.
+    - Daily holdings history for last 30 days filtered by account or symbol; monthly series **per account only** from `monthly_snapshots` (no monthly per holding).
+- [x] **6.3 Portfolio UI (React)**
+  - [x] Page at `/portfolio`: shows **today’s total portfolio value**, breakdown **by account**, and positions **within each account** (all clickable).
+  - [x] Selecting:
+    - **Total** shows last 30 days (daily total) and past 12 months (monthly total).
+    - **An account** shows last 30 days (daily for that account) and past 12 months (monthly for that account).
+    - **A holding** shows last 30 days (daily for that symbol in that account) and indicates that monthly per holding is not available.
+  - [x] Data is updated exclusively by nightly cron; there is no manual “refresh” button on the portfolio page.
 
-**Done when:** React shows current Fidelity positions and portfolio history: daily for recent two months, monthly for older months.
+**Done when:** React shows current Fidelity/Snaptrade positions and portfolio history: **daily** for last 30 days and **monthly** for older months (per account, summed for total), matching the investments‑only snapshot schema.
 
 ---
 
 ## Slice 7: Nightly cron — Plaid safety check + Snaptrade + daily snapshots
 
-**Goal:** One **nightly cron** at 11pm that: (1) **Plaid safety check** — for each Plaid item, run cursor-based `/transactions/sync` to the very end so the cursor is at end of book (catch anything webhooks missed). (2) **Snaptrade** — fetch holdings/balances, refresh connection status, and write **daily** portfolio snapshots for today (`daily_snapshots`, `daily_holdings`). (3) At end of month (or first run of new month), write that month's rollup to `monthly_snapshots` and `monthly_holdings`. We **do** store daily snapshots for portfolio, but after a month we delete that month's daily rows and keep only the monthly value (Slice 9). So we keep daily for current month + previous month only (e.g. in April: daily for March and April, monthly for January and February).
+**Goal:** One **nightly cron** at 11pm that: (1) **Plaid safety check** — use the webhook‑set `new_transactions_pending` flag to run cursor‑based `/transactions/sync` for items that actually had activity, so the cursor is at end of book and we don’t miss transactions. (2) **Snaptrade** — fetch holdings/balances, refresh connection status, and write **daily** portfolio snapshots for today (`daily_snapshots`, `daily_holdings`). (3) At end of month, write that month's per‑account rollup to `monthly_snapshots` before later pruning daily rows (Slice 9). We **do** store daily snapshots for portfolio, but after a month we delete that month's daily rows and keep only the monthly value. So we keep daily for current month + previous month only (e.g. in April: daily for March and April, monthly for January and February).
 
-- [ ] **7.1 Snapshot schema (Go + Supabase)**
-  - [ ] Supabase: `daily_snapshots` (date, net_worth_cents, portfolio_value_cents, cash_cents, liabilities_cents); `daily_holdings` (date, account_id, symbol, quantity, value_cents); `monthly_snapshots` (month, …); `monthly_holdings` (month, account_id, symbol, value_cents).
-- [ ] **7.2 Cron job — Plaid safety + Snaptrade + daily snapshots (Go)**
-  - [ ] Go: endpoint `POST /api/cron/daily-sync` that (1) **Plaid:** for each item, run cursor-based `/transactions/sync` to the end and upsert any new/updated transactions; (2) **Snaptrade:** fetch holdings/balances, refresh connection status, compute today's net worth and per-holding values, insert into `daily_snapshots` and `daily_holdings`; (3) if today is last day of month or first run of new month, compute that month's rollup and insert into `monthly_snapshots` and `monthly_holdings`. Protect with `CRON_SECRET`.
+- [x] **7.1 Snapshot schema (Go + Supabase)**
+  - [x] Supabase: portfolio‑only schema is in place via `supabase/migrations/portfolio_snapshots.sql`: `daily_snapshots` (date, `portfolio_value_cents`), `daily_holdings` (date, account_id, symbol, quantity, value_cents), and `monthly_snapshots` (month, account_id, `portfolio_value_cents`). We are **not** storing net worth/cash/liabilities snapshots yet; those will be derived on the fly for graphs.
+- [x] **7.2 Cron job — Plaid safety + Snaptrade + daily snapshots (Go)**
+  - [x] Go: endpoint `POST /api/cron/daily-sync` protected by `CRON_SECRET` (via `X-Cron-Secret` header or `?secret=`) that:
+    - [x] **Plaid:** looks up items with `new_transactions_pending=true` and runs cursor‑based `TransactionsSync` for each via `SyncTransactionsForItem`, upserting new/updated transactions and deleting removed ones, then updates `transactions_cursor` and clears the pending flag.
+    - [x] **Snaptrade:** fetches accounts (`ListAccounts`) and positions (`ListAccountPositions`), writes per‑position `daily_holdings` rows and a total `daily_snapshots` row for today (sum of all accounts), and on the last day of the month writes end‑of‑month per‑account `monthly_snapshots`.
+    - [x] **Connection status:** calls `checkAndUpdatePlaidItemStatuses` and `checkAndUpdateSnaptradeConnectionStatuses` to keep `plaid_items.status` and `snaptrade_connections.status` up to date for the Link Management UI.
 - [ ] **7.3 Schedule (use whatever is free)**
   - [ ] Use a **free** scheduler: **GitHub Actions** or **Vercel Cron**. Call `POST https://<your-go-api>/api/cron/daily-sync` with `CRON_SECRET` at 11pm.
-- [ ] **7.4 API for charts**
-  - [ ] Go: endpoint(s) to read daily snapshots/holdings for recent date ranges and monthly for older (for Slice 8).
-- [ ] **7.5 Credit card payment/transfer detection**
-  - [ ] When syncing or using transactions: detect payment transactions (checking → credit card). Treat them as transfers: do not count as expenses (so budget/spent and expense views exclude them; avoids double-counting with the checking-account outflow). Optionally flag or store as transfer type so liabilities/net worth stay correct.
+- [x] **7.4 API for charts**
+  - [x] Go: portfolio chart APIs are already in place from Slice 6:
+    - `GET /api/portfolio/snapshots` — returns daily total series (from `daily_snapshots`) and monthly total series (aggregated from `monthly_snapshots`) for the portfolio or a single account.
+    - `GET /api/portfolio/holdings/history` — returns daily holdings from `daily_holdings` for an account or symbol. Slice 8 will consume these for graphs.
+  - [x] Transactions/budget chart data will reuse the existing summary and budget endpoints.
 
-**Done when:** At 11pm, cron runs Plaid cursor safety check + Snaptrade fetch + daily portfolio snapshots; at month-end, monthly rollup is written; daily data is kept for current + previous month, then rolled to monthly (Slice 9). Credit card payments are treated as transfers and excluded from expense totals.
+**Done when:** At 11pm, cron runs Plaid cursor‑based sync for items with pending transactions, Snaptrade fetch + daily portfolio snapshots, and at month‑end writes monthly rollups; daily data is kept for current + previous month, then rolled to monthly (Slice 9).
 
 ---
 

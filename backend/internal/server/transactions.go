@@ -229,24 +229,28 @@ func handleGetTransactionsSummary(w http.ResponseWriter, r *http.Request, deps a
 		return
 	}
 
-	// Gets the transactions and categories
+	// Gets the transactions and categories.
 	list, err := deps.db.ListTransactions(r.Context(), database.ListTransactionsFilter{Month: month})
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+
 	categories, err := deps.db.ListCategories(r.Context())
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	// Calculates the income, expenses, and invested amounts.
-	var investmentsID int64
+    // Calculates the income, expenses, and invested amounts.
+	var investmentsID, transferCategoryID int64
 	expenseCategoryIDs := make(map[int64]bool)
 	for _, category := range categories {
 		if category.Name == "Investments" {
 			investmentsID = category.ID
+		}
+		if category.Name == "Transfer" {
+			transferCategoryID = category.ID
 		}
 		if category.Expense {
 			expenseCategoryIDs[category.ID] = true
@@ -256,6 +260,10 @@ func handleGetTransactionsSummary(w http.ResponseWriter, r *http.Request, deps a
 	// Loops through the transactions and calculates the income, expenses, and invested amounts.
 	var incomeCents, expensesCents, investedCents int64
 	for _, transaction := range list {
+		// Skip bank transfers from expense calculations.
+		if transaction.CategoryID != nil && *transaction.CategoryID == transferCategoryID {
+			continue
+		}
 		if transaction.AmountCents < 0 {
 			incomeCents += -transaction.AmountCents
 		} else {
@@ -533,14 +541,14 @@ func calculateMonthlySpentByCategory(ctx context.Context, dbClient *database.Cli
 		}
 	}
 
-	// Computes the monthly spent by category.
+    // Loops through the transactions and calculates the monthly spent by category.
 	for _, transaction := range transactions {
 		categoryID := *transaction.CategoryID
 		if !expenseCategoryIDs[categoryID] {
 			continue
 		}
 		categoryName := categories[categoryID].Name
-		monthlySpending[categoryName] += transaction.AmountCents
+        monthlySpending[categoryName] += transaction.AmountCents
 	}
 	return monthlySpending, nil
 }

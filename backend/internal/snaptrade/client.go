@@ -37,6 +37,13 @@ type Account struct {
 	BalanceCurrency string  `json:"balance_currency"`
 }
 
+// Account Holdings Position.
+type Position struct {
+	Symbol     string  `json:"symbol"`
+	Quantity   float64 `json:"quantity"`
+	ValueCents int64   `json:"value_cents"`
+}
+
 // Constructs a Snaptrade client from environment variables.
 func NewClientFromEnv() (*Client, error) {
 	clientID := os.Getenv("SNAPTRADE_CLIENT_ID")
@@ -167,4 +174,51 @@ func (c *Client) ListAccounts(userID, userSecret string) ([]Account, error) {
 		accounts = append(accounts, account)
 	}
 	return accounts, nil
+}
+
+// Lists positions (holdings) for a specific account.
+func (c *Client) ListAccountPositions(userID, userSecret, accountID string) ([]Position, error) {
+	req := c.api.AccountInformationApi.GetUserAccountPositions(accountID, userID, userSecret)
+	positions, _, err := req.Execute()
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert the positions to Position Struct.
+	var result []Position
+	for _, pos := range positions {
+		// Get the symbol from the position.
+		symbol := ""
+		if sym, ok := pos.GetSymbolOk(); ok && sym != nil {
+			universal := sym.GetSymbol()
+			symbol = universal.GetSymbol()
+		}
+
+		// Get the number of shares from the position.
+		quantity := 0.0
+		if pos.HasUnits() {
+			quantity = float64(pos.GetUnits())
+		}
+
+		// Get the price per share from the position.
+		pricePerShare := float32(0)
+		if pos.HasPrice() {
+			pricePerShare = pos.GetPrice()
+		}
+
+		// Get the value in cents from the position.
+		valueCents := int64(0)
+		if quantity > 0 && pricePerShare > 0 {
+			valueCents = int64(float64(pricePerShare) * quantity * 100)
+		}
+
+		// Add the position to the result.
+		result = append(result, Position{
+			Symbol:     symbol,
+			Quantity:   quantity,
+			ValueCents: valueCents,
+		})
+	}
+
+	return result, nil
 }

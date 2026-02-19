@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { apiRequest } from '../lib/api'
-import { Link } from 'react-router-dom'
 import { openSnaptradeConnect, syncSnaptradeConnections } from '../lib/snaptrade'
 import { PlaidLinkButton } from './PlaidLinkButton'
 import { SnaptradeConnectSection } from './SnaptradeConnectSection'
@@ -139,18 +138,10 @@ export function LinkManagement() {
     }
   }
 
-  // Returns the link management page.
-  return (
-    <div className="max-w-4xl mx-auto py-12 px-5">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Connections</h1>
-        <Link
-          to="/dashboard"
-          className="py-2 px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
-        >
-          Dashboard
-        </Link>
-      </div>
+    // Returns the link management page.
+    return (
+    <div className="max-w-4xl mx-auto py-8 px-5">
+      <h1 className="text-2xl font-semibold text-gray-900 mb-2">Connections</h1>
       <p className="text-sm text-gray-600 mb-4">
         Manage your Plaid bank connections and Snaptrade brokerage connections. This app is
         single-user: these are your connections only.

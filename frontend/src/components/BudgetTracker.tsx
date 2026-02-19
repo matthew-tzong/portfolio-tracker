@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { apiRequest } from '../lib/api'
-import { supabase } from '../lib/supabase'
 
 // Category types.
 interface Category {
@@ -31,7 +29,6 @@ function currentMonth(): string {
 }
 
 export function BudgetTracker() {
-  const [user, setUser] = useState<{ email?: string } | null>(null)
   const [categories, setCategories] = useState<Category[]>([])
   const [month, setMonth] = useState(currentMonth())
   const [allocations, setAllocations] = useState<Record<string, number>>({})
@@ -41,11 +38,6 @@ export function BudgetTracker() {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [totalBudget, setTotalBudget] = useState<string>('')
-
-  // Loads the user from Supabase.
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
-  }, [])
 
   // Loads the categories from the backend.
   const loadCategories = useCallback(async () => {
@@ -96,11 +88,6 @@ export function BudgetTracker() {
   useEffect(() => {
     void loadBudget()
   }, [loadBudget])
-
-  // Handles sign out.
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-  }
 
   // Formats the currency.
   const formatCurrency = (cents: number) =>
@@ -189,40 +176,10 @@ export function BudgetTracker() {
     }
   }
 
-  // Returns the budget tracker UI.
+  // Returns the budget tracker page.
   return (
-    <div className="max-w-4xl mx-auto py-12 px-5">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">Budget tracker</h1>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/dashboard"
-            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Dashboard
-          </Link>
-          <Link
-            to="/expenses"
-            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Expense tracker
-          </Link>
-          <Link
-            to="/links"
-            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Manage connections
-          </Link>
-          <button
-            onClick={handleSignOut}
-            className="py-2 px-4 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-
-      <p className="text-gray-600 mb-6">Signed in as {user?.email ?? '...'}</p>
+    <div className="max-w-4xl mx-auto py-8 px-5">
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Budget tracker</h1>
 
       <div className="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="flex flex-wrap items-end gap-4 mb-4">
@@ -328,7 +285,9 @@ export function BudgetTracker() {
                                 min={0}
                                 step="0.01"
                                 value={allocatedCents > 0 ? (allocatedCents / 100).toString() : ''}
-                                onChange={(e) => handleAllocationChange(category.id, e.target.value)}
+                                onChange={(e) =>
+                                  handleAllocationChange(category.id, e.target.value)
+                                }
                                 className="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
                                 placeholder="0.00"
                               />

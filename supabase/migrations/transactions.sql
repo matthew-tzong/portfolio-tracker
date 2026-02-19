@@ -91,8 +91,12 @@ SELECT 'fidelity', id FROM categories WHERE name = 'Investments' LIMIT 1;
 -- ADD another rule—do not replace this one. Example (add a row, keep the 'rent' row):
 --   INSERT INTO category_rules (match_string, category_id)
 --   SELECT 'Your Landlord Or Utility Payee Name', id FROM categories WHERE name = 'Rent and Utilities' LIMIT 1;
--- INSERT INTO category_rules (match_string, category_id)
--- SELECT 'rent', id FROM categories WHERE name = 'Rent and Utilities' LIMIT 1;
+INSERT INTO category_rules (match_string, category_id)
+SELECT 'rent', id FROM categories WHERE name = 'Rent and Utilities' LIMIT 1;
+-- Credit card payments: detect common issuers and map to Transfer category (expense=false).
+-- These are excluded from expense/budget calculations to avoid double-counting with card purchases.
+INSERT INTO category_rules (match_string, category_id)
+SELECT 'discover', id FROM categories WHERE name = 'Transfer' LIMIT 1;
 
 -- Plaid transactions
 CREATE TABLE IF NOT EXISTS transactions (

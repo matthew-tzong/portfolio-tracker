@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { apiRequest } from '../lib/api'
-import { supabase } from '../lib/supabase'
 
 // Account type.
 interface Account {
@@ -27,19 +25,11 @@ interface AccountsResponse {
 
 // Main signed-in dashboard for the single-user app, shows autheticated user
 export function Dashboard() {
-  const [user, setUser] = useState<{ email?: string } | null>(null)
   const [pingResult, setPingResult] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [accountsData, setAccountsData] = useState<AccountsResponse | null>(null)
   const [accountsLoading, setAccountsLoading] = useState(false)
   const [accountsError, setAccountsError] = useState<string | null>(null)
-
-  // On mount, fetch the current authenticated user so we can show their email.
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user)
-    })
-  }, [])
 
   // Loads current accounts and net worth from the backend.
   const loadAccounts = async () => {
@@ -74,11 +64,6 @@ export function Dashboard() {
     }
   }
 
-  // Signs the user out of Supabase and redirects them to `/auth`.
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-  }
-
   // Formats the currency.
   const formatCurrency = (cents: number) =>
     new Intl.NumberFormat('en-US', {
@@ -87,40 +72,10 @@ export function Dashboard() {
       maximumFractionDigits: 2,
     }).format(cents / 100)
 
-  // Returns the dashboard.
-  return (
-    <div className="max-w-3xl mx-auto py-12 px-5">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-semibold text-gray-900">My portfolio</h1>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/expenses"
-            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
-          >
-            Expense tracker
-          </Link>
-          <Link
-            to="/budget"
-            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
-          >
-            Budget tracker
-          </Link>
-          <Link
-            to="/links"
-            className="py-2 px-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2"
-          >
-            Manage connections
-          </Link>
-          <button
-            onClick={handleSignOut}
-            className="py-2 px-4 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-
-      <p className="text-gray-600 mb-6">Signed in as {user?.email ?? '...'}</p>
+  // Returns the dashboard page.
+    return (
+    <div className="max-w-3xl mx-auto py-8 px-5">
+      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
 
       <div className="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
         <h2 className="text-lg font-medium text-gray-900 mb-2">Net worth</h2>

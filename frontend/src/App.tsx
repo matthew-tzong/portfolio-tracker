@@ -5,6 +5,8 @@ import { ExpenseTracker } from './components/ExpenseTracker'
 import { ProtectedRoute } from './components/ProtectedRoute'
 import { LinkManagement } from './components/LinkManagement'
 import { BudgetTracker } from './components/BudgetTracker'
+import { Portfolio } from './components/Portfolio'
+import { MainLayout } from './components/MainLayout'
 
 /**
 Route graph:
@@ -14,45 +16,27 @@ Route graph:
  - `/links`: protected link management page
  - `/expenses`: protected expense tracker (transactions by month/category)
  - `/budget`: protected budget tracker (global budgets, monthly spent vs budget)
- */
+ - `/portfolio`: protected portfolio view (holdings, daily/monthly snapshots)
+*/
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/auth" element={<Auth />} />
         <Route
-          path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <MainLayout />
             </ProtectedRoute>
           }
-        />
-        <Route
-          path="/links"
-          element={
-            <ProtectedRoute>
-              <LinkManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/expenses"
-          element={
-            <ProtectedRoute>
-              <ExpenseTracker />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/budget"
-          element={
-            <ProtectedRoute>
-              <BudgetTracker />
-            </ProtectedRoute>
-          }
-        />
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        >
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="links" element={<LinkManagement />} />
+          <Route path="expenses" element={<ExpenseTracker />} />
+          <Route path="budget" element={<BudgetTracker />} />
+          <Route path="portfolio" element={<Portfolio />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   )

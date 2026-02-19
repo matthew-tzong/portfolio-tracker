@@ -75,6 +75,20 @@ func Run() error {
 		snaptradeClient: snaptradeClient,
 	})
 
+	// Registers the portfolio routes.
+	registerPortfolioRoutes(mux, apiDependencies{
+		db:              dbClient,
+		plaidClient:     plaidClient,
+		snaptradeClient: snaptradeClient,
+	})
+
+	// Registers the cron routes used by external schedulers.
+	registerCronRoutes(mux, apiDependencies{
+		db:              dbClient,
+		plaidClient:     plaidClient,
+		snaptradeClient: snaptradeClient,
+	})
+
 	handler := withCORS(mux)
 
 	port := getEnv("PORT", "8080")
