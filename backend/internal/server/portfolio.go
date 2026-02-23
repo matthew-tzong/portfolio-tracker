@@ -214,7 +214,7 @@ func handleGetSnapshots(w http.ResponseWriter, r *http.Request, deps apiDependen
 			})
 		}
 	} else {
-		// List the total monthly snapshot across all accounts.
+		// List the total monthly snapshots across all accounts and aggregate them.
 		allMonthly, err := deps.db.ListMonthlySnapshots(r.Context(), monthlyStart, dayStart)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to list monthly snapshots: "+err.Error())
@@ -226,7 +226,10 @@ func handleGetSnapshots(w http.ResponseWriter, r *http.Request, deps apiDependen
 			sumByMonth[month] += snapshot.PortfolioValueCents
 		}
 		for month, sum := range sumByMonth {
-			monthlyPoints = append(monthlyPoints, SnapshotDataPoint{Date: month, PortfolioValueCents: sum})
+			monthlyPoints = append(monthlyPoints, SnapshotDataPoint{
+				Date:                month,
+				PortfolioValueCents: sum,
+			})
 		}
 		sortSnapshotDataPoints(monthlyPoints)
 	}

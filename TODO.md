@@ -202,23 +202,21 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 ---
 
-## Slice 10: CI/CD and deploy
+## Slice 10: Tests, CI, and deploy
 
-**Goal:** Lint and test both Go and React on push; deploy React to Vercel and Go to a host; cron and webhook working.
+**Goal:** Have unit tests for backend and frontend, CI that runs them on every push/PR, and a deployment model where the whole app runs together on Vercel.
 
-- [ ] **10.1 Tests**
-  - [ ] **Go**: unit tests for categorization, net-worth calculation, snapshot aggregation (mocked Plaid/Snaptrade). `go test ./...`
-  - [ ] **React**: optional unit tests for critical UI or helpers; e.g. Jest or Vitest in `frontend/`.
-- [ ] **10.2 CI (GitHub Actions)**
-  - [ ] On push/PR: checkout repo; run Go lint and tests (`backend/`); run React install, lint, typecheck, tests (`frontend/`). No secrets in workflow; optional Vercel deploy for frontend on main.
-- [ ] **10.3 Deploy**
-  - [ ] **React**: connect `frontend/` (or repo with root dir) to Vercel; set env vars (e.g. Supabase URL, anon key, API base URL for Go — use `VITE_*` if using Vite). Build command and output dir for your React setup.
-  - [ ] **Go**: deploy backend to Fly.io, Railway, or similar. Set env: Supabase URL/key, JWT secret, Plaid, Snaptrade, CRON_SECRET, webhook secret. Ensure Go API URL is HTTPS so Plaid webhook and Vercel cron can call it.
-  - [ ] **Plaid**: webhook URL `https://<your-go-api>/api/webhooks/plaid`; nightly cron runs Plaid cursor-based sync as safety check (cursor to end of book). **Cron**: single nightly job calls `https://<your-go-api>/api/cron/daily-sync` with CRON_SECRET at 11pm (Plaid safety + Snaptrade + daily portfolio snapshots).
-- [ ] **10.4 CORS**
-  - [ ] Go backend allows frontend origin (Vercel preview and prod URLs) in CORS so React can call the API.
+- [x] **10.1 Backend tests**
+  - [x] Add and run Go unit tests for core business logic (categorization, net-worth calculation, snapshot aggregation, retention math) via `go test ./...` in `backend/`.
+- [x] **10.2 Frontend tests**
+  - [x] Add and run React/TypeScript unit tests for critical helpers (e.g. API client or calculation helpers) using Vitest in `frontend/`.
+- [x] **10.3 CI (GitHub Actions)**
+  - [x] On push/PR: checkout repo; run `go test ./...` in `backend/`; run `npm ci`, `npm test`, `npm run lint`, and `npm run build` in `frontend/`. No secrets required in workflow.
+- [x] **10.4 Deploy (single Vercel project)**
+  - [x] Configure a single Vercel project for this repo so the built React app and Go backend are deployed together (e.g. Vercel monorepo / serverless functions), with env vars set for Supabase, Plaid, Snaptrade, cron secret, and API base URL.
+  - [x] Plaid webhook points at `/api/webhooks/plaid` on the Vercel host; nightly cron (Vercel Cron or similar) calls `/api/cron/daily-sync` with `CRON_SECRET` so transactions and portfolio snapshots stay in sync.
 
-**Done when:** Push runs CI for Go and React; React is live on Vercel and Go is live on Fly/Railway; Plaid webhook + nightly cron (cursor safety) keep transactions in sync; 11pm cron runs Plaid safety + Snaptrade + daily portfolio snapshots; app is usable end-to-end.
+**Done when:** Push runs CI for Go and React (including unit tests) and the whole app is deployed on Vercel as a single project, with Plaid webhook + nightly cron wired up.
 
 ---
 
