@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 
 // Mock for the fetch function.
 const fetchMock = vi.fn()
@@ -30,7 +30,7 @@ describe('apiRequest', () => {
   // Test that the function throws when there is no active session.
   it('throws when there is no active session', async () => {
     const { supabase } = await import('./supabase')
-    ;(supabase.auth.getSession as any).mockResolvedValue({ data: { session: null } })
+    ;(supabase.auth.getSession as Mock).mockResolvedValue({ data: { session: null } })
     await expect(apiRequest('/api/test')).rejects.toThrow('Not authenticated')
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -38,7 +38,7 @@ describe('apiRequest', () => {
   // Test that the function attaches the bearer token and returns parsed JSON.
   it('attaches bearer token and returns parsed JSON', async () => {
     const { supabase } = await import('./supabase')
-    ;(supabase.auth.getSession as any).mockResolvedValue({
+    ;(supabase.auth.getSession as Mock).mockResolvedValue({
       data: { session: { access_token: 'test-token' } },
     })
     fetchMock.mockResolvedValue({
@@ -59,7 +59,7 @@ describe('apiRequest', () => {
   // Test that the function throws a helpful error when the response is not ok.
   it('throws a helpful error when response is not ok', async () => {
     const { supabase } = await import('./supabase')
-    ;(supabase.auth.getSession as any).mockResolvedValue({
+    ;(supabase.auth.getSession as Mock).mockResolvedValue({
       data: { session: { access_token: 'test-token' } },
     })
     fetchMock.mockResolvedValue({
