@@ -38,6 +38,22 @@ interface CategoriesResponse {
   categories: Category[]
 }
 
+// Yearly expense summary (by category).
+interface YearlyExpenseCategory {
+  categoryId: number
+  categoryName: string
+  totalCents: number
+  transactionCount: number
+}
+
+interface YearlyExpenseSummaryResponse {
+  year: number
+  byCategory: YearlyExpenseCategory[]
+}
+
+const START_MONTH = '2026-02'
+const START_YEAR = 2026
+
 // Returns the current month in YYYY-MM.
 function currentMonth(): string {
   const day = new Date()
@@ -49,13 +65,21 @@ function currentMonth(): string {
 export function ExpenseTracker() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [categories, setCategories] = useState<Category[]>([])
-  const [month, setMonth] = useState(currentMonth())
+  const [month, setMonth] = useState(() => {
+    const m = currentMonth()
+    return m < START_MONTH ? START_MONTH : m
+  })
   const [categoryId, setCategoryId] = useState<string>('')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(false)
   const [summary, setSummary] = useState<TransactionsSummaryResponse | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const [yearlySummaryYear, setYearlySummaryYear] = useState<string>('')
+  const [yearlySummary, setYearlySummary] = useState<YearlyExpenseSummaryResponse | null>(null)
+  const [yearlySummaryLoading, setYearlySummaryLoading] = useState(false)
+  const [yearlySummaryError, setYearlySummaryError] = useState<string | null>(null)
 
   // Loads the categories from the backend.
   const loadCategories = useCallback(async () => {
@@ -132,6 +156,33 @@ export function ExpenseTracker() {
     void loadSummary()
   }, [loadSummary])
 
+  // Loads the yearly expense summary by category.
+  const loadYearlySummary = useCallback(async () => {
+    if (!yearlySummaryYear) {
+      setYearlySummary(null)
+      setYearlySummaryError(null)
+      setYearlySummaryLoading(false)
+      return
+    }
+    setYearlySummaryLoading(true)
+    setYearlySummaryError(null)
+    try {
+      const res = await apiRequest<YearlyExpenseSummaryResponse>(
+        `/api/transactions/summary/yearly?year=${encodeURIComponent(yearlySummaryYear)}`,
+      )
+      setYearlySummary(res)
+    } catch (err) {
+      setYearlySummaryError(err instanceof Error ? err.message : 'Failed to load yearly summary')
+      setYearlySummary(null)
+    } finally {
+      setYearlySummaryLoading(false)
+    }
+  }, [yearlySummaryYear])
+
+  useEffect(() => {
+    void loadYearlySummary()
+  }, [loadYearlySummary])
+
   // Formats the currency.
   const formatCurrency = (cents: number) =>
     new Intl.NumberFormat('en-US', {
@@ -140,14 +191,16 @@ export function ExpenseTracker() {
       maximumFractionDigits: 2,
     }).format(cents / 100)
 
-  // Builds month options for the last 24 months.
+  // Builds month options starting from Feb 2026 through today.
   const monthOptions: string[] = []
-  const day = new Date()
-  for (let i = 0; i < 24; i++) {
-    const year = day.getFullYear()
-    const month = String(day.getMonth() + 1).padStart(2, '0')
-    monthOptions.push(`${year}-${month}`)
-    day.setMonth(day.getMonth() - 1)
+  const now = new Date()
+  const startMonthDate = new Date(Date.UTC(START_YEAR, 1, 1))
+  const cursor = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
+  while (cursor >= startMonthDate) {
+    const y = cursor.getUTCFullYear()
+    const m = String(cursor.getUTCMonth() + 1).padStart(2, '0')
+    monthOptions.push(`${y}-${m}`)
+    cursor.setUTCMonth(cursor.getUTCMonth() - 1)
   }
 
   // Aggregates expenses by category
@@ -157,18 +210,51 @@ export function ExpenseTracker() {
     }
     const totalsByCategory: Record<string, number> = {}
     transactions.forEach((transaction) => {
-      if (transaction.amountCents >= 0) {
+      const categoryName = transaction.categoryName || 'Uncategorized'
+      if (categoryName === 'Transfer') {
         return
       }
-      const categoryName = transaction.categoryName || 'Uncategorized'
-      totalsByCategory[categoryName] =
-        (totalsByCategory[categoryName] ?? 0) + Math.abs(transaction.amountCents)
+      const delta = -transaction.amountCents
+      totalsByCategory[categoryName] = (totalsByCategory[categoryName] ?? 0) + delta
     })
     return Object.entries(totalsByCategory).map(([name, valueCents]) => ({
       name,
-      value: valueCents / 100,
+      value: Math.max(valueCents, 0) / 100,
     }))
   }, [transactions])
+
+  // Exports transactions for the current month as CSV.
+  const handleExportTransactions = async () => {
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+      const response = await fetch(`${API_URL}/api/export/transactions?month=${month}`, {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to export transactions')
+      }
+
+      // Downloads the CSV file.
+      const blob = await response.blob()
+      const objectURL = window.URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectURL
+      anchor.download = `transactions-${month}.csv`
+      document.body.appendChild(anchor)
+      anchor.click()
+      window.URL.revokeObjectURL(objectURL)
+      document.body.removeChild(anchor)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to export transactions')
+    }
+  }
 
   // Returns the expense tracker page.
   return (
@@ -215,6 +301,15 @@ export function ExpenseTracker() {
               placeholder="Name or merchant"
               className="block w-56 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
             />
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={handleExportTransactions}
+              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              Export CSV
+            </button>
           </div>
         </div>
 
@@ -302,7 +397,7 @@ export function ExpenseTracker() {
                         )}
                       </td>
                       <td className="px-4 py-2 text-right font-medium">
-                        <span className={tx.amountCents >= 0 ? 'text-red-700' : 'text-green-700'}>
+                        <span className={tx.amountCents > 0 ? 'text-green-700' : 'text-red-700'}>
                           {formatCurrency(tx.amountCents)}
                         </span>
                       </td>
@@ -313,6 +408,73 @@ export function ExpenseTracker() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* Yearly expense summary by category */}
+      <div className="mt-8 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Yearly expense summary</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Total spent per category for a full year (from retained yearly summaries). Data appears
+          after retention has run for that year.
+        </p>
+        <div className="flex items-end gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <select
+              value={yearlySummaryYear}
+              onChange={(e) => setYearlySummaryYear(e.target.value)}
+              className="block w-32 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+            >
+              <option value="">Select…</option>
+              {Array.from(
+                { length: Math.max(0, new Date().getFullYear() - START_YEAR + 1) },
+                (_, i) => new Date().getFullYear() - i,
+              ).map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {yearlySummaryError && <p className="text-sm text-red-600 mb-4">{yearlySummaryError}</p>}
+        {!yearlySummaryYear ? (
+          <p className="text-sm text-gray-500">Select a year to view yearly totals.</p>
+        ) : yearlySummaryLoading ? (
+          <p className="text-sm text-gray-500">Loading…</p>
+        ) : yearlySummary && yearlySummary.byCategory.length > 0 ? (
+          <div className="overflow-hidden rounded-md border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium text-gray-700">Category</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-700">Spent</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-700">Transactions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {yearlySummary.byCategory.map((row) => (
+                  <tr key={row.categoryId}>
+                    <td className="px-4 py-2 font-medium text-gray-900">{row.categoryName}</td>
+                    <td className="px-4 py-2 text-right text-red-700">
+                      {formatCurrency(row.totalCents)}
+                    </td>
+                    <td className="px-4 py-2 text-right text-gray-600">{row.transactionCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 text-sm font-medium text-gray-900">
+              Total:{' '}
+              {formatCurrency(yearlySummary.byCategory.reduce((s, r) => s + r.totalCents, 0))}
+            </div>
+          </div>
+        ) : yearlySummary && yearlySummary.byCategory.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            No yearly data for {yearlySummaryYear}. Summaries are created when retention runs (e.g.
+            after year-end).
+          </p>
+        ) : null}
       </div>
     </div>
   )

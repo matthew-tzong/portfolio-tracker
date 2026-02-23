@@ -43,6 +43,20 @@ interface HoldingsHistoryResponse {
   daily: HoldingDataPoint[]
 }
 
+// Yearly portfolio summary by account.
+interface YearlyPortfolioAccount {
+  accountId: string
+  portfolioValueCents: number
+}
+
+interface YearlyPortfolioSummaryResponse {
+  year: number
+  byAccount: YearlyPortfolioAccount[]
+}
+
+const START_MONTH = '2026-02'
+const START_YEAR = 2026
+
 // Selected item for the portfolio.
 type SelectedItem =
   | null
@@ -69,11 +83,23 @@ export function Portfolio() {
 
   const [selected, setSelected] = useState<SelectedItem>(null)
 
+  const currentDate = new Date()
+  const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)
+  const [exportMonth, setExportMonth] = useState(() => {
+    const lm = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}`
+    return lm < START_MONTH ? START_MONTH : lm
+  })
+
   const [historyDaily, setHistoryDaily] = useState<HoldingDataPoint[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
 
   const [accountMonthly, setAccountMonthly] = useState<SnapshotDataPoint[]>([])
   const [accountMonthlyLoading, setAccountMonthlyLoading] = useState(false)
+
+  const [yearlySummaryYear, setYearlySummaryYear] = useState<string>('')
+  const [yearlySummary, setYearlySummary] = useState<YearlyPortfolioSummaryResponse | null>(null)
+  const [yearlySummaryLoading, setYearlySummaryLoading] = useState(false)
+  const [yearlySummaryError, setYearlySummaryError] = useState<string | null>(null)
 
   // Loads the holdings.
   const loadHoldings = useCallback(async () => {
@@ -108,6 +134,33 @@ export function Portfolio() {
     loadHoldings()
     loadSnapshots()
   }, [loadHoldings, loadSnapshots])
+
+  // Loads yearly portfolio summary by account.
+  const loadYearlySummary = useCallback(async () => {
+    if (!yearlySummaryYear) {
+      setYearlySummary(null)
+      setYearlySummaryError(null)
+      setYearlySummaryLoading(false)
+      return
+    }
+    setYearlySummaryLoading(true)
+    setYearlySummaryError(null)
+    try {
+      const res = await apiRequest<YearlyPortfolioSummaryResponse>(
+        `/api/portfolio/summary/yearly?year=${encodeURIComponent(yearlySummaryYear)}`,
+      )
+      setYearlySummary(res)
+    } catch (err) {
+      setYearlySummaryError(err instanceof Error ? err.message : 'Failed to load yearly summary')
+      setYearlySummary(null)
+    } finally {
+      setYearlySummaryLoading(false)
+    }
+  }, [yearlySummaryYear])
+
+  useEffect(() => {
+    void loadYearlySummary()
+  }, [loadYearlySummary])
 
   // Loads the holdings and snapshots when the selected item changes.
   useEffect(() => {
@@ -222,10 +275,126 @@ export function Portfolio() {
     return `${selected.symbol} (${selected.accountName})`
   })()
 
+  // Exports portfolio snapshots for a month as CSV.
+  const handleExportSnapshots = async () => {
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+      const response = await fetch(
+        `${API_URL}/api/export/portfolio/snapshots?month=${exportMonth}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to export snapshots')
+      }
+
+      // Downloads the CSV file.
+      const blob = await response.blob()
+      const objectURL = window.URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectURL
+      anchor.download = `portfolio-snapshots-${exportMonth}.csv`
+      document.body.appendChild(anchor)
+      anchor.click()
+      window.URL.revokeObjectURL(objectURL)
+      document.body.removeChild(anchor)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to export snapshots')
+    }
+  }
+
+  // Exports portfolio holdings for a month as CSV.
+  const handleExportHoldings = async () => {
+    try {
+      const { supabase } = await import('../lib/supabase')
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+      const response = await fetch(
+        `${API_URL}/api/export/portfolio/holdings?month=${exportMonth}`,
+        {
+          headers: {
+            Authorization: `Bearer ${session?.access_token}`,
+          },
+        },
+      )
+
+      if (!response.ok) {
+        throw new Error('Failed to export holdings')
+      }
+
+      // Downloads the CSV file.
+      const blob = await response.blob()
+      const objectURL = window.URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = objectURL
+      anchor.download = `portfolio-holdings-${exportMonth}.csv`
+      document.body.appendChild(anchor)
+      anchor.click()
+      window.URL.revokeObjectURL(objectURL)
+      document.body.removeChild(anchor)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to export holdings')
+    }
+  }
+
+  // Generates month options for export dropdown (last 13 months including current).
+  const generateMonthOptions = () => {
+    const monthOptions: string[] = []
+    const now = new Date()
+    const startMonthDate = new Date(Date.UTC(START_YEAR, 1, 1))
+    const cursor = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
+    while (cursor >= startMonthDate) {
+      const y = cursor.getUTCFullYear()
+      const m = String(cursor.getUTCMonth() + 1).padStart(2, '0')
+      monthOptions.push(`${y}-${m}`)
+      cursor.setUTCMonth(cursor.getUTCMonth() - 1)
+    }
+    return monthOptions
+  }
+
   // Returns the portfolio page.
   return (
     <div className="max-w-7xl mx-auto py-8 px-5">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Portfolio</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Portfolio</h1>
+        <div className="flex items-center gap-3">
+          <select
+            value={exportMonth}
+            onChange={(e) => setExportMonth(e.target.value)}
+            className="block rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+          >
+            {generateMonthOptions().map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleExportSnapshots}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Export Snapshots
+          </button>
+          <button
+            type="button"
+            onClick={handleExportHoldings}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          >
+            Export Holdings
+          </button>
+        </div>
+      </div>
 
       {/* Total portfolio value for the day (data updates via nightly cron) */}
       <div className="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
@@ -436,6 +605,78 @@ export function Portfolio() {
           )}
         </div>
       )}
+
+      {/* Yearly portfolio summary by account (end-of-year value) */}
+      <div className="mt-8 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">Yearly portfolio summary</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          End-of-year portfolio value per account (from retained yearly summaries). Data appears
+          after retention has run for that year.
+        </p>
+        <div className="flex items-end gap-4 mb-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <select
+              value={yearlySummaryYear}
+              onChange={(e) => setYearlySummaryYear(e.target.value)}
+              className="block w-32 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+            >
+              <option value="">Select…</option>
+              {Array.from(
+                { length: Math.max(0, new Date().getFullYear() - START_YEAR + 1) },
+                (_, i) => new Date().getFullYear() - i,
+              ).map((y) => (
+                <option key={y} value={y}>
+                  {y}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {yearlySummaryError && <p className="text-sm text-red-600 mb-4">{yearlySummaryError}</p>}
+        {!yearlySummaryYear ? (
+          <p className="text-sm text-gray-500">Select a year to view yearly totals.</p>
+        ) : yearlySummaryLoading ? (
+          <p className="text-sm text-gray-500">Loading…</p>
+        ) : yearlySummary && yearlySummary.byAccount.length > 0 ? (
+          <div className="overflow-hidden rounded-md border border-gray-200">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-2 text-left font-medium text-gray-700">Account</th>
+                  <th className="px-4 py-2 text-right font-medium text-gray-700">
+                    End-of-year value
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {yearlySummary.byAccount.map((row) => {
+                  const displayName = holdingsByAccount[row.accountId]?.accountName ?? row.accountId
+                  return (
+                    <tr key={row.accountId}>
+                      <td className="px-4 py-2 font-medium text-gray-900">{displayName}</td>
+                      <td className="px-4 py-2 text-right text-gray-700">
+                        {formatCurrency(row.portfolioValueCents)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 text-sm font-medium text-gray-900">
+              Total:{' '}
+              {formatCurrency(
+                yearlySummary.byAccount.reduce((s, r) => s + r.portfolioValueCents, 0),
+              )}
+            </div>
+          </div>
+        ) : yearlySummary && yearlySummary.byAccount.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            No yearly data for {yearlySummaryYear}. Summaries are created when retention runs (e.g.
+            after year-end).
+          </p>
+        ) : null}
+      </div>
     </div>
   )
 }

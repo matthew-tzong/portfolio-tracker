@@ -2,6 +2,8 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"sort"
 	"time"
@@ -54,6 +56,18 @@ type HoldingsHistoryResponse struct {
 	Daily []HoldingDataPoint `json:"daily"`
 }
 
+// Yearly portfolio summary by account.
+type yearlyPortfolioAccountJSON struct {
+	AccountID           string `json:"accountId"`
+	PortfolioValueCents int64  `json:"portfolioValueCents"`
+}
+
+// Yearly portfolio summary response.
+type yearlyPortfolioSummaryResponse struct {
+	Year      int                          `json:"year"`
+	ByAccount []yearlyPortfolioAccountJSON `json:"byAccount"`
+}
+
 // Registers the portfolio routes.
 func registerPortfolioRoutes(mux *http.ServeMux, deps apiDependencies) {
 	// GET /api/portfolio/holdings returns current positions from Snaptrade.
@@ -81,6 +95,15 @@ func registerPortfolioRoutes(mux *http.ServeMux, deps apiDependencies) {
 			return
 		}
 		handleGetHoldingsHistory(w, r, deps)
+	})))
+
+	// GET /api/portfolio/summary/yearly returns yearly portfolio summary by account (end-of-year value per account).
+	mux.Handle("/api/portfolio/summary/yearly", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		handleGetYearlyPortfolioSummary(w, r, deps)
 	})))
 }
 
@@ -289,4 +312,52 @@ func handleGetHoldingsHistory(w http.ResponseWriter, r *http.Request, deps apiDe
 	}
 
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// Returns yearly portfolio summary by account (end-of-year value per account).
+func handleGetYearlyPortfolioSummary(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if deps.db == nil {
+		writeJSONError(w, http.StatusInternalServerError, "database not configured")
+		return
+	}
+
+	// Parses the year.
+	yearStr := r.URL.Query().Get("year")
+	if yearStr == "" {
+		writeJSONError(w, http.StatusBadRequest, "year parameter is required (e.g. 2024)")
+		return
+	}
+	var year int
+	_, err := fmt.Sscanf(yearStr, "%d", &year)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "year must be a valid 4-digit year")
+		return
+	}
+
+	// Lists the yearly portfolio summaries.
+	summaries, err := deps.db.ListYearlyPortfolioSummaries(r.Context(), year)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to list yearly portfolio summary: "+err.Error())
+		return
+	}
+
+	// Converts the summaries to our API model.
+	byAccount := make([]yearlyPortfolioAccountJSON, 0, len(summaries))
+	for _, summary := range summaries {
+		byAccount = append(byAccount, yearlyPortfolioAccountJSON{
+			AccountID:           summary.AccountID,
+			PortfolioValueCents: summary.PortfolioValueCents,
+		})
+	}
+
+	// Encodes the response.
+	err = json.NewEncoder(w).Encode(yearlyPortfolioSummaryResponse{
+		Year:      year,
+		ByAccount: byAccount,
+	})
+	if err != nil {
+		log.Printf("get yearly portfolio summary encode: %v", err)
+	}
 }

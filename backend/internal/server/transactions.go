@@ -29,6 +29,9 @@ func registerTransactionsRoutes(mux *http.ServeMux, deps apiDependencies) {
 	mux.Handle("/api/transactions/summary", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handleGetTransactionsSummary(w, r, deps)
 	})))
+	mux.Handle("/api/transactions/summary/yearly", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handleGetYearlyExpenseSummary(w, r, deps)
+	})))
 	mux.Handle("/api/transactions/sync", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		handleSyncTransactions(w, r, deps)
 	})))
@@ -257,25 +260,27 @@ func handleGetTransactionsSummary(w http.ResponseWriter, r *http.Request, deps a
 		}
 	}
 
-	// Loops through the transactions and calculates the income, expenses, and invested amounts.
+	// Tracks expenses (spend/refund), investments, and income.
 	var incomeCents, expensesCents, investedCents int64
 	for _, transaction := range list {
-		// Skip bank transfers from expense calculations.
 		if transaction.CategoryID != nil && *transaction.CategoryID == transferCategoryID {
 			continue
 		}
-		if transaction.AmountCents < 0 {
-			incomeCents += -transaction.AmountCents
+		amountCents := transaction.AmountCents
+		// Expense category: negative = spend, positive = refund
+		if transaction.CategoryID != nil && expenseCategoryIDs[*transaction.CategoryID] {
+			expensesCents += -amountCents
+			continue
+		}
+		if transaction.CategoryID != nil && *transaction.CategoryID == investmentsID {
+			investedCents += -amountCents
+			continue
+		}
+		// Income or uncategorized: positive = income, negative = expense
+		if amountCents > 0 {
+			incomeCents += amountCents
 		} else {
-			if transaction.CategoryID != nil {
-				if *transaction.CategoryID == investmentsID {
-					investedCents += transaction.AmountCents
-				} else if expenseCategoryIDs[*transaction.CategoryID] {
-					expensesCents += transaction.AmountCents
-				}
-			} else {
-				expensesCents += transaction.AmountCents
-			}
+			expensesCents += -amountCents
 		}
 	}
 
@@ -287,6 +292,70 @@ func handleGetTransactionsSummary(w http.ResponseWriter, r *http.Request, deps a
 	})
 	if err != nil {
 		log.Printf("get transactions summary encode: %v", err)
+	}
+}
+
+// Returns yearly expense summary by category for a given year.
+func handleGetYearlyExpenseSummary(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
+	if r.Method != http.MethodGet {
+		methodNotAllowed(w, http.MethodGet)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if deps.db == nil {
+		writeJSONError(w, http.StatusInternalServerError, "database not configured")
+		return
+	}
+
+	// Parses the year.
+	yearStr := r.URL.Query().Get("year")
+	if yearStr == "" {
+		writeJSONError(w, http.StatusBadRequest, "year parameter is required (e.g. 2024)")
+		return
+	}
+	var year int
+	_, err := fmt.Sscanf(yearStr, "%d", &year)
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "year must be a valid 4-digit year")
+		return
+	}
+
+	// Lists the yearly expense summaries.
+	summaries, err := deps.db.ListYearlyExpenseSummaries(r.Context(), year)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to list yearly expense summary: "+err.Error())
+		return
+	}
+
+	// Maps category IDs to names.
+	categories, _ := deps.db.ListCategories(r.Context())
+	categoryNameByID := make(map[int64]string)
+	for _, category := range categories {
+		categoryNameByID[category.ID] = category.Name
+	}
+
+	// Converts the summaries to our API model.
+	byCategory := make([]yearlyExpenseCategoryJSON, 0, len(summaries))
+	for _, summary := range summaries {
+		name := categoryNameByID[summary.CategoryID]
+		if name == "" {
+			name = "Uncategorized"
+		}
+		byCategory = append(byCategory, yearlyExpenseCategoryJSON{
+			CategoryID:       summary.CategoryID,
+			CategoryName:     name,
+			TotalCents:       summary.TotalCents,
+			TransactionCount: summary.TransactionCount,
+		})
+	}
+
+	// Encodes the response.
+	err = json.NewEncoder(w).Encode(yearlyExpenseSummaryResponse{
+		Year:       year,
+		ByCategory: byCategory,
+	})
+	if err != nil {
+		log.Printf("get yearly expense summary encode: %v", err)
 	}
 }
 
@@ -529,26 +598,27 @@ func calculateMonthlySpentByCategory(ctx context.Context, dbClient *database.Cli
 		return nil, err
 	}
 
-	// Fetches and filters to expense categories.
+	// Fetch categories and filter to expense categories.
 	categories, err := dbClient.ListCategories(ctx)
 	if err != nil {
 		return nil, err
 	}
-	expenseCategoryIDs := make(map[int64]bool)
+	categoriesByID := make(map[int64]database.Category, len(categories))
 	for _, category := range categories {
-		if category.Expense {
-			expenseCategoryIDs[category.ID] = true
-		}
+		categoriesByID[category.ID] = category
 	}
-
 	// Loops through the transactions and calculates the monthly spent by category.
 	for _, transaction := range transactions {
-		categoryID := *transaction.CategoryID
-		if !expenseCategoryIDs[categoryID] {
+		if transaction.CategoryID == nil {
 			continue
 		}
-		categoryName := categories[categoryID].Name
-		monthlySpending[categoryName] += transaction.AmountCents
+		category, ok := categoriesByID[*transaction.CategoryID]
+		if !ok || !category.Expense {
+			continue
+		}
+
+		categoryName := category.Name
+		monthlySpending[categoryName] += -transaction.AmountCents
 	}
 	return monthlySpending, nil
 }
@@ -589,6 +659,20 @@ type transactionsSummaryResponse struct {
 	IncomeCents   int64 `json:"incomeCents"`
 	ExpensesCents int64 `json:"expensesCents"`
 	InvestedCents int64 `json:"investedCents"`
+}
+
+// Yearly expense summary by category.
+type yearlyExpenseCategoryJSON struct {
+	CategoryID       int64  `json:"categoryId"`
+	CategoryName     string `json:"categoryName"`
+	TotalCents       int64  `json:"totalCents"`
+	TransactionCount int    `json:"transactionCount"`
+}
+
+// Yearly expense summary response.
+type yearlyExpenseSummaryResponse struct {
+	Year       int                         `json:"year"`
+	ByCategory []yearlyExpenseCategoryJSON `json:"byCategory"`
 }
 
 // Budget API response

@@ -1,6 +1,6 @@
 module github.com/matthewtzong/portfolio-tracker/backend
 
-go 1.22
+go 1.23
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
@@ -9,6 +9,7 @@ require (
 
 require (
 	github.com/golang/protobuf v1.4.2 // indirect
+	github.com/resend/resend-go/v3 v3.1.0 // indirect
 	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
 	golang.org/x/oauth2 v0.0.0-20210323180902-22b0adad7558 // indirect
 	google.golang.org/appengine v1.6.6 // indirect

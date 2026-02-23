@@ -898,6 +898,294 @@ func (c *Client) ListMonthlySnapshotsByAccount(ctx context.Context, startMonth, 
 	return snapshots, nil
 }
 
+// Deletes all transactions in the given month.
+func (c *Client) DeleteTransactionsInMonth(ctx context.Context, monthStart time.Time) error {
+	monthEnd := monthStart.AddDate(0, 1, -1)
+	startStr := monthStart.Format("2006-01-02")
+	endStr := monthEnd.Format("2006-01-02")
+	url := c.restURL("transactions") + "?date=gte." + startStr + "&date=lte." + endStr
+
+	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase delete transactions in month failed: %s", string(body))
+	}
+	return nil
+}
+
+// Deletes daily snapshots older than the given date.
+func (c *Client) DeleteDailySnapshotsOlderThan(ctx context.Context, cutoffDate time.Time) error {
+	cutoffStr := cutoffDate.Format("2006-01-02")
+	url := c.restURL("daily_snapshots") + "?date=lt." + cutoffStr
+
+	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase delete daily_snapshots older than failed: %s", string(body))
+	}
+	return nil
+}
+
+// Deletes daily holdings older than the given date.
+func (c *Client) DeleteDailyHoldingsOlderThan(ctx context.Context, cutoffDate time.Time) error {
+	cutoffStr := cutoffDate.Format("2006-01-02")
+	url := c.restURL("daily_holdings") + "?date=lt." + cutoffStr
+
+	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase delete daily_holdings older than failed: %s", string(body))
+	}
+	return nil
+}
+
+// Deletes monthly snapshots for a given year.
+func (c *Client) DeleteMonthlySnapshotsForYear(ctx context.Context, year int) error {
+	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	yearEnd := time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
+	startStr := yearStart.Format("2006-01-02")
+	endStr := yearEnd.Format("2006-01-02")
+	url := c.restURL("monthly_snapshots") + fmt.Sprintf("?month=gte.%s&month=lte.%s", startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase delete monthly_snapshots for year failed: %s", string(body))
+	}
+	return nil
+}
+
+// Upserts a monthly expense summary.
+func (c *Client) UpsertMonthlyExpenseSummary(ctx context.Context, summary *MonthlyExpenseSummary) error {
+	if summary == nil {
+		return errors.New("summary is nil")
+	}
+
+	url := c.restURL("monthly_expense_summary") + "?on_conflict=month,category_id"
+	resp, err := c.doRequest(ctx, http.MethodPost, url, summary)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert monthly_expense_summary failed: %s", string(body))
+	}
+	return nil
+}
+
+// Upserts a yearly expense summary.
+func (c *Client) UpsertYearlyExpenseSummary(ctx context.Context, summary *YearlyExpenseSummary) error {
+	if summary == nil {
+		return errors.New("summary is nil")
+	}
+
+	url := c.restURL("yearly_expense_summary") + "?on_conflict=year,category_id"
+	resp, err := c.doRequest(ctx, http.MethodPost, url, summary)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert yearly_expense_summary failed: %s", string(body))
+	}
+	return nil
+}
+
+// Upserts a yearly portfolio summary.
+func (c *Client) UpsertYearlyPortfolioSummary(ctx context.Context, summary *YearlyPortfolioSummary) error {
+	if summary == nil {
+		return errors.New("summary is nil")
+	}
+
+	url := c.restURL("yearly_portfolio_summary") + "?on_conflict=year,account_id"
+	resp, err := c.doRequest(ctx, http.MethodPost, url, summary)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert yearly_portfolio_summary failed: %s", string(body))
+	}
+	return nil
+}
+
+// Lists transactions for a given month (for export before deletion).
+func (c *Client) ListTransactionsForMonth(ctx context.Context, month time.Time) ([]Transaction, error) {
+	startDate := time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, time.UTC)
+	endDate := startDate.AddDate(0, 1, -1)
+	startStr := startDate.Format("2006-01-02")
+	endStr := endDate.Format("2006-01-02")
+	url := c.restURL("transactions") + fmt.Sprintf("?date=gte.%s&date=lte.%s&order=date.asc", startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list transactions for month failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of transactions.
+	var transactions []Transaction
+	err = json.NewDecoder(resp.Body).Decode(&transactions)
+	if err != nil {
+		return nil, err
+	}
+	return transactions, nil
+}
+
+// Lists monthly snapshots for a given year (for export before deletion).
+func (c *Client) ListMonthlySnapshotsForYear(ctx context.Context, year int) ([]MonthlySnapshot, error) {
+	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
+	yearEnd := time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
+	return c.ListMonthlySnapshots(ctx, yearStart, yearEnd)
+}
+
+// Lists monthly expense summaries within a date range.
+func (c *Client) ListMonthlyExpenseSummaries(ctx context.Context, startDate, endDate time.Time) ([]MonthlyExpenseSummary, error) {
+	startStr := startDate.Format("2006-01-02")
+	endStr := endDate.Format("2006-01-02")
+	url := c.restURL("monthly_expense_summary") + fmt.Sprintf("?month=gte.%s&month=lte.%s&order=month.asc", startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list monthly_expense_summary failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of monthly expense summaries.
+	var summaries []MonthlyExpenseSummary
+	err = json.NewDecoder(resp.Body).Decode(&summaries)
+	if err != nil {
+		return nil, err
+	}
+	return summaries, nil
+}
+
+// Lists yearly expense summaries for a given year.
+func (c *Client) ListYearlyExpenseSummaries(ctx context.Context, year int) ([]YearlyExpenseSummary, error) {
+	url := c.restURL("yearly_expense_summary") + fmt.Sprintf("?year=eq.%d&order=category_id.asc", year)
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list yearly_expense_summary failed: %s", string(body))
+	}
+
+	var summaries []YearlyExpenseSummary
+	err = json.NewDecoder(resp.Body).Decode(&summaries)
+	if err != nil {
+		return nil, err
+	}
+	return summaries, nil
+}
+
+// Lists yearly portfolio summaries for a given year.
+func (c *Client) ListYearlyPortfolioSummaries(ctx context.Context, year int) ([]YearlyPortfolioSummary, error) {
+	url := c.restURL("yearly_portfolio_summary") + fmt.Sprintf("?year=eq.%d&order=account_id.asc", year)
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list yearly_portfolio_summary failed: %s", string(body))
+	}
+
+	var summaries []YearlyPortfolioSummary
+	err = json.NewDecoder(resp.Body).Decode(&summaries)
+	if err != nil {
+		return nil, err
+	}
+	return summaries, nil
+}
+
+// Upserts a monthly net worth snapshot.
+func (c *Client) UpsertMonthlyNetWorth(ctx context.Context, snapshot *MonthlyNetWorth) error {
+	if snapshot == nil {
+		return errors.New("snapshot is nil")
+	}
+
+	url := c.restURL("monthly_net_worth") + "?on_conflict=month"
+	resp, err := c.doRequest(ctx, http.MethodPost, url, snapshot)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase upsert monthly_net_worth failed: %s", string(body))
+	}
+	return nil
+}
+
+// Lists monthly net worth snapshots within a month range.
+func (c *Client) ListMonthlyNetWorth(ctx context.Context, startMonth, endMonth time.Time) ([]MonthlyNetWorth, error) {
+	startStr := startMonth.Format("2006-01-02")
+	endStr := endMonth.Format("2006-01-02")
+	url := c.restURL("monthly_net_worth") + fmt.Sprintf("?month=gte.%s&month=lte.%s&order=month.asc", startStr, endStr)
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("supabase list monthly_net_worth failed: %s", string(body))
+	}
+
+	// Decodes the response body into a slice of monthly net worth snapshots.
+	var snapshots []MonthlyNetWorth
+	err = json.NewDecoder(resp.Body).Decode(&snapshots)
+	if err != nil {
+		return nil, err
+	}
+	return snapshots, nil
+}
+
 // Represents a row in the plaid_items table.
 type PlaidItem struct {
 	ID                     int64     `json:"id,omitempty"`
@@ -1023,6 +1311,46 @@ type DailyHolding struct {
 type MonthlySnapshot struct {
 	ID                  int64     `json:"id,omitempty"`
 	Month               time.Time `json:"month"`
+	AccountID           string    `json:"account_id"`
+	PortfolioValueCents int64     `json:"portfolio_value_cents"`
+	CreatedAt           time.Time `json:"created_at,omitempty"`
+}
+
+// Represents a row in the monthly_net_worth table.
+type MonthlyNetWorth struct {
+	ID               int64     `json:"id,omitempty"`
+	Month            time.Time `json:"month"`
+	NetWorthCents    int64     `json:"net_worth_cents"`
+	CashCents        int64     `json:"cash_cents"`
+	InvestmentsCents int64     `json:"investments_cents"`
+	LiabilitiesCents int64     `json:"liabilities_cents"`
+	CreatedAt        time.Time `json:"created_at,omitempty"`
+}
+
+// Represents a row in the monthly_expense_summary table.
+type MonthlyExpenseSummary struct {
+	ID               int64     `json:"id,omitempty"`
+	Month            time.Time `json:"month"`
+	CategoryID       int64     `json:"category_id"`
+	TotalCents       int64     `json:"total_cents"`
+	TransactionCount int       `json:"transaction_count"`
+	CreatedAt        time.Time `json:"created_at,omitempty"`
+}
+
+// Represents a row in the yearly_expense_summary table.
+type YearlyExpenseSummary struct {
+	ID               int64     `json:"id,omitempty"`
+	Year             int       `json:"year"`
+	CategoryID       int64     `json:"category_id"`
+	TotalCents       int64     `json:"total_cents"`
+	TransactionCount int       `json:"transaction_count"`
+	CreatedAt        time.Time `json:"created_at,omitempty"`
+}
+
+// Represents a row in the yearly_portfolio_summary table.
+type YearlyPortfolioSummary struct {
+	ID                  int64     `json:"id,omitempty"`
+	Year                int       `json:"year"`
 	AccountID           string    `json:"account_id"`
 	PortfolioValueCents int64     `json:"portfolio_value_cents"`
 	CreatedAt           time.Time `json:"created_at,omitempty"`

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiRequest } from '../lib/api'
+import { TimeSeriesChart } from './TimeSeriesChart'
 
 // Account type.
 interface Account {
@@ -23,6 +24,15 @@ interface AccountsResponse {
   liabilitiesCents: number
 }
 
+// Net worth snapshot response type.
+interface NetWorthSnapshot {
+  month: string
+  netWorthCents: number
+  cashCents: number
+  investmentsCents: number
+  liabilitiesCents: number
+}
+
 // Main signed-in dashboard for the single-user app, shows autheticated user
 export function Dashboard() {
   const [pingResult, setPingResult] = useState<string>('')
@@ -30,6 +40,10 @@ export function Dashboard() {
   const [accountsData, setAccountsData] = useState<AccountsResponse | null>(null)
   const [accountsLoading, setAccountsLoading] = useState(false)
   const [accountsError, setAccountsError] = useState<string | null>(null)
+
+  const [netWorthSnapshots, setNetWorthSnapshots] = useState<NetWorthSnapshot[]>([])
+  const [netWorthLoading, setNetWorthLoading] = useState(false)
+  const [netWorthError, setNetWorthError] = useState<string | null>(null)
 
   // Loads current accounts and net worth from the backend.
   const loadAccounts = async () => {
@@ -46,9 +60,25 @@ export function Dashboard() {
     }
   }
 
+  // Loads monthly net worth snapshots from the backend.
+  const loadNetWorthSnapshots = async () => {
+    setNetWorthLoading(true)
+    setNetWorthError(null)
+    try {
+      const res = await apiRequest<{ monthly: NetWorthSnapshot[] }>('/api/net-worth/snapshots')
+      setNetWorthSnapshots(res.monthly ?? [])
+    } catch (err: unknown) {
+      setNetWorthError(err instanceof Error ? err.message : 'Failed to load net worth history')
+      setNetWorthSnapshots([])
+    } finally {
+      setNetWorthLoading(false)
+    }
+  }
+
   // Loads the accounts on mount.
   useEffect(() => {
     void loadAccounts()
+    void loadNetWorthSnapshots()
   }, [])
 
   // Tests the validation of the Supabase JWT.
@@ -154,6 +184,26 @@ export function Dashboard() {
               </div>
             )}
           </>
+        )}
+      </div>
+
+      <div className="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
+        <h2 className="text-lg font-medium text-gray-900 mb-2">Net worth over time</h2>
+        {netWorthLoading && <p className="text-sm text-gray-600">Loading net worth history...</p>}
+        {netWorthError && (
+          <p className="text-sm text-red-600">Failed to load net worth history: {netWorthError}</p>
+        )}
+        {!netWorthLoading && !netWorthError && (
+          <div className="mt-2">
+            <TimeSeriesChart
+              title="Monthly net worth"
+              data={netWorthSnapshots.map((s) => ({
+                date: s.month,
+                value: s.netWorthCents / 100,
+              }))}
+              height={260}
+            />
+          </div>
         )}
       </div>
 

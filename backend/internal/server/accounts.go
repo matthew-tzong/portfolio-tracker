@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
+	"time"
 
 	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
 	"github.com/matthewtzong/portfolio-tracker/backend/internal/serverauth"
@@ -41,6 +42,15 @@ func registerAccountsRoutes(mux *http.ServeMux, deps apiDependencies) {
 			return
 		}
 		handleGetAccounts(w, r, deps)
+	})))
+
+	// GET /api/net-worth/snapshots returns monthly net worth snapshots over time.
+	mux.Handle("/api/net-worth/snapshots", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
+			return
+		}
+		handleGetNetWorthSnapshots(w, r, deps)
 	})))
 }
 
@@ -110,6 +120,47 @@ func handleGetAccounts(w http.ResponseWriter, r *http.Request, deps apiDependenc
 
 	// Return the accounts and net worth breakdown.
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// Returns monthly net worth snapshots over time.
+func handleGetNetWorthSnapshots(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
+	w.Header().Set("Content-Type", "application/json")
+	if deps.db == nil {
+		writeJSONError(w, http.StatusInternalServerError, "database is not configured")
+		return
+	}
+
+	// Default: return full history (no pruning) so long-term net worth is visible.
+	now := time.Now().UTC()
+	endMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+	startMonth := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+	snapshots, err := deps.db.ListMonthlyNetWorth(r.Context(), startMonth, endMonth)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to list monthly net worth: "+err.Error())
+		return
+	}
+
+	// Converts the monthly net worth snapshots to the netWorthSnapshotJSON view model.
+	type netWorthSnapshotJSON struct {
+		Month            string `json:"month"`
+		NetWorthCents    int64  `json:"netWorthCents"`
+		CashCents        int64  `json:"cashCents"`
+		InvestmentsCents int64  `json:"investmentsCents"`
+		LiabilitiesCents int64  `json:"liabilitiesCents"`
+	}
+
+	output := make([]netWorthSnapshotJSON, len(snapshots))
+	for i, snapshot := range snapshots {
+		output[i] = netWorthSnapshotJSON{
+			Month:            snapshot.Month.Format("2006-01-02"),
+			NetWorthCents:    snapshot.NetWorthCents,
+			CashCents:        snapshot.CashCents,
+			InvestmentsCents: snapshot.InvestmentsCents,
+			LiabilitiesCents: snapshot.LiabilitiesCents,
+		}
+	}
+
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"monthly": output})
 }
 
 // Load Plaid Accounts from the database

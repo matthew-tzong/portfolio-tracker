@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS daily_snapshots (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_daily_snapshots_date ON daily_snapshots(date DESC);
-
 -- Daily holdings (positions per account per day)
 CREATE TABLE IF NOT EXISTS daily_holdings (
   id BIGSERIAL PRIMARY KEY,
@@ -28,11 +26,6 @@ CREATE TABLE IF NOT EXISTS daily_holdings (
   UNIQUE(date, account_id, symbol)
 );
 
-CREATE INDEX IF NOT EXISTS idx_daily_holdings_date ON daily_holdings(date DESC);
-CREATE INDEX IF NOT EXISTS idx_daily_holdings_account_id ON daily_holdings(account_id);
-CREATE INDEX IF NOT EXISTS idx_daily_holdings_symbol ON daily_holdings(symbol);
-CREATE INDEX IF NOT EXISTS idx_daily_holdings_date_account ON daily_holdings(date, account_id);
-
 -- Monthly portfolio snapshots (end-of-month rollup; investments only).
 -- One row per (month, account_id). Total portfolio for a month = SUM(portfolio_value_cents) for that month.
 CREATE TABLE IF NOT EXISTS monthly_snapshots (
@@ -44,6 +37,13 @@ CREATE TABLE IF NOT EXISTS monthly_snapshots (
   UNIQUE(month, account_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_monthly_snapshots_month ON monthly_snapshots(month DESC);
-CREATE INDEX IF NOT EXISTS idx_monthly_snapshots_account_id ON monthly_snapshots(account_id);
-CREATE INDEX IF NOT EXISTS idx_monthly_snapshots_month_account ON monthly_snapshots(month, account_id);
+CREATE TABLE IF NOT EXISTS monthly_net_worth (
+  id BIGSERIAL PRIMARY KEY,
+  month DATE NOT NULL UNIQUE,
+  net_worth_cents BIGINT NOT NULL,
+  cash_cents BIGINT NOT NULL,
+  investments_cents BIGINT NOT NULL,
+  liabilities_cents BIGINT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+

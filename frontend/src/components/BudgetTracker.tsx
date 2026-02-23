@@ -21,6 +21,9 @@ interface CategoriesResponse {
   categories: Category[]
 }
 
+const START_MONTH = '2026-02'
+const START_YEAR = 2026
+
 // Returns the current month in YYYY-MM.
 function currentMonth(): string {
   const day = new Date()
@@ -31,7 +34,10 @@ function currentMonth(): string {
 
 export function BudgetTracker() {
   const [categories, setCategories] = useState<Category[]>([])
-  const [month, setMonth] = useState(currentMonth())
+  const [month, setMonth] = useState(() => {
+    const m = currentMonth()
+    return m < START_MONTH ? START_MONTH : m
+  })
   const [allocations, setAllocations] = useState<Record<string, number>>({})
   const [spent, setSpent] = useState<Record<string, number>>({})
   const [loading, setLoading] = useState(false)
@@ -98,14 +104,16 @@ export function BudgetTracker() {
       maximumFractionDigits: 2,
     }).format(cents / 100)
 
-  // Builds month options for the last 24 months.
+  // Builds month options starting from Feb 2026 through today.
   const monthOptions: string[] = []
-  const day = new Date()
-  for (let i = 0; i < 24; i++) {
-    const year = day.getFullYear()
-    const m = String(day.getMonth() + 1).padStart(2, '0')
-    monthOptions.push(`${year}-${m}`)
-    day.setMonth(day.getMonth() - 1)
+  const now = new Date()
+  const startMonthDate = new Date(Date.UTC(START_YEAR, 1, 1))
+  const cursor = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
+  while (cursor >= startMonthDate) {
+    const y = cursor.getUTCFullYear()
+    const m = String(cursor.getUTCMonth() + 1).padStart(2, '0')
+    monthOptions.push(`${y}-${m}`)
+    cursor.setUTCMonth(cursor.getUTCMonth() - 1)
   }
 
   // Builds data for budget vs spent chart.

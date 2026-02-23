@@ -179,23 +179,26 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
 
 **Retention rules**
 
-- **CC daily transactions:** Delete after **3 months**. Before deleting, keep **monthly overall** (e.g. total spent per category for the month). Export that month's transactions as CSV before delete.
-- **CC monthly data:** Keep **1 year**; then delete. Keep **yearly overall** for CC (e.g. total balance or total spent per year). Export month as CSV before deleting.
-- **Portfolio daily:** We store **daily** snapshots for the **current month and previous month** only (e.g. in April: daily for March and April). After a month ends, **delete all daily** snapshots/holdings for that month and keep only the **monthly** value (one row in `monthly_snapshots` and rows in `monthly_holdings`). So in April we have daily for March + April, and monthly for January, February. Export that month's daily data as CSV before deleting.
-- **Portfolio monthly** (`monthly_snapshots`, `monthly_holdings`): Keep **1 year**; then delete and keep **yearly overall**. Export that month's data as CSV before deleting.
-- **Export-before-delete:** For any month being pruned (CC or portfolio), generate and offer download of that month's CSV first, then delete the rows.
+- **Expenses:** Delete after **1 year**. Before deleting, export that month's transactions as CSV, email via Resend, then delete.
+- **Expenses yearly data:** Monthly expense summaries (`monthly_expense_summary`) created before transaction delete; yearly expense summaries (`yearly_expense_summary`) created when pruning a year's monthly summaries. Optional: API/UI to view yearly overall by category.
+- **Portfolio daily:** Keep **daily** snapshots for the **last 30 days** only. When deleting a day that is month-end, ensure monthly snapshot exists first; then delete daily rows.
+- **Portfolio monthly** (`monthly_snapshots`): Keep full year until end of following year; then export that year's monthly data as CSV, email, create `yearly_portfolio_summary`, delete monthly rows. Optional: API/UI to view yearly overall by account.
+- **Export-before-delete:** CSV generated and emailed (Resend) before any retention delete.
 
-- [ ] **9.1 Schema for rollups (Go + Supabase)**
-  - [ ] Tables: `monthly_expense_summary` (month, category, total_cents) for CC; `monthly_snapshots` and `monthly_holdings` (Slice 7) for portfolio; `yearly_cc_summary`, `yearly_portfolio_summary` for yearly overall. Populate yearly when pruning monthly after 1 year.
-- [ ] **9.2 CSV export (Go + React)**
-  - [ ] Go: auth-protected endpoint(s) to export a given month's transactions or snapshot/holdings as CSV (stream or download). Used by retention job and optionally by user ("Export this month").
-  - [ ] React: button or page to trigger export (e.g. "Export month" or "Export last 12 months") that calls Go and downloads the file.
-- [ ] **9.3 Retention job (Go)**
-  - [ ] Go: cron-invoked or scheduled job that: (1) **Portfolio daily:** for any month that is older than "previous month" (e.g. when in April, months before March), ensure that month's daily rows are rolled up: export that month's daily data to CSV, insert/update monthly_snapshots and monthly_holdings for that month, then delete all daily_snapshots and daily_holdings for that month. So we only keep daily for current + previous month. (2) **CC:** prune transactions older than 3 months (after monthly summary); prune CC monthly older than 1 year (keep yearly). (3) **Portfolio monthly:** prune older than 1 year (keep yearly overall). Export before delete in all cases. Run daily or weekly.
-- [ ] **9.4 Document rules**
-  - [ ] Document retention rules and export-before-delete in README or runbook.
+- [x] **9.1 Schema for rollups (Go + Supabase)**
+  - [x] Tables: `monthly_expense_summary`, `yearly_expense_summary`, `yearly_portfolio_summary` (see `supabase/migrations/retention_tracking.sql`); `monthly_snapshots` (portfolio); `monthly_net_worth` (net worth EOM). Cron populates monthly expense summary and yearly summaries when pruning.
+- [x] **9.2 CSV export (Go + React)**
+  - [x] Go: auth-protected `GET /api/export/transactions?month=`, `GET /api/export/portfolio/snapshots?month=`, `GET /api/export/portfolio/holdings?month=`. Shared CSV logic in `retention_csv.go` (`BuildTransactionsCSV`, `BuildPortfolioSnapshotsCSV`). Retention job emails CSV via Resend before delete.
+  - [x] React: export buttons on Expense Tracker and Portfolio pages trigger download for selected month.
+- [x] **9.3 Retention job (Go)**
+  - [x] Nightly cron runs retention: transaction retention (1-year-old month → export, email, delete); daily snapshot pruning (keep 30 days, write month-end to monthly first); on Dec 31, previous year's monthly snapshots → export, email, yearly summaries, delete.
+- [x] **9.4 Document rules**
+  - [x] `RETENTION.md` documents retention rules and export-before-delete.
+- [x] **9.5 View yearly summaries**
+  - [x] API: `GET /api/transactions/summary/yearly?year=`, `GET /api/portfolio/summary/yearly?year=`. DB: `ListYearlyExpenseSummaries`, `ListYearlyPortfolioSummaries`.
+  - [x] UI: Expense Tracker — "Yearly expense summary" section (year dropdown, table by category). Portfolio — "Yearly portfolio summary" section (year dropdown, table by account with end-of-year value).
 
-**Done when:** Each month's data is exported as CSV before deletion; portfolio daily kept only for current + previous month (older months rolled to monthly); CC daily → 3 months then monthly (1 year) then yearly; portfolio monthly → 1 year then yearly overall; DB stays within free tier.
+**Done when:** All data being tracked is exported as CSV before deletion as defined by retention rules; DB stays within free tier.
 
 ---
 
