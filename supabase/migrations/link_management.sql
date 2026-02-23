@@ -12,9 +12,6 @@ CREATE TABLE IF NOT EXISTS plaid_items (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Index for quick lookups by item_id
-CREATE INDEX IF NOT EXISTS idx_plaid_items_item_id ON plaid_items(item_id);
-
 -- Plaid Accounts: stores accounts belonging to each Plaid item
 CREATE TABLE IF NOT EXISTS plaid_accounts (
     id BIGSERIAL PRIMARY KEY,
@@ -27,11 +24,7 @@ CREATE TABLE IF NOT EXISTS plaid_accounts (
     current_balance DECIMAL(15, 2) NOT NULL DEFAULT 0
 );
 
--- Index for quick lookups by item
-CREATE INDEX IF NOT EXISTS idx_plaid_accounts_item_id ON plaid_accounts(plaid_item_id);
-
 -- Snaptrade User: stores the single Snaptrade user credentials for this app
--- (single-user app, so only one row expected)
 CREATE TABLE IF NOT EXISTS snaptrade_user (
     id BIGSERIAL PRIMARY KEY,
     user_id TEXT NOT NULL UNIQUE,
@@ -46,6 +39,3 @@ CREATE TABLE IF NOT EXISTS snaptrade_connections (
     status TEXT NOT NULL DEFAULT 'OK',
     last_synced TIMESTAMPTZ
 );
-
--- Index for quick lookups by connection id
-CREATE INDEX IF NOT EXISTS idx_snaptrade_connections_conn_id ON snaptrade_connections(conn_id);

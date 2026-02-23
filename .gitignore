@@ -13,3 +13,4 @@ frontend/.env.*
 .cursor/plans
 CURRENT_STATE.md
 SUPABASE_SETUP.md
+local_test.md

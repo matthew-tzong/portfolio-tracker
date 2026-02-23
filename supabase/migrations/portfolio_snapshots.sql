@@ -1,11 +1,5 @@
 -- Portfolio Snapshot Tables (investments only — not net worth, cash, or liabilities)
 
--- Retention policy:
--- - Keep daily snapshots for the last 30 days from today only.
--- - When we delete a daily row that is the last day of a month, we first write that day's
---   snapshot as the monthly snapshot for that month, then delete the daily row.
--- - Cron writes daily; retention job rolls EOM to monthly and deletes old daily.
-
 -- Daily portfolio snapshots (investments / brokerage value only)
 CREATE TABLE IF NOT EXISTS daily_snapshots (
   id BIGSERIAL PRIMARY KEY,
@@ -27,7 +21,6 @@ CREATE TABLE IF NOT EXISTS daily_holdings (
 );
 
 -- Monthly portfolio snapshots (end-of-month rollup; investments only).
--- One row per (month, account_id). Total portfolio for a month = SUM(portfolio_value_cents) for that month.
 CREATE TABLE IF NOT EXISTS monthly_snapshots (
   id BIGSERIAL PRIMARY KEY,
   month DATE NOT NULL,
@@ -37,6 +30,7 @@ CREATE TABLE IF NOT EXISTS monthly_snapshots (
   UNIQUE(month, account_id)
 );
 
+-- Monthly net worth snapshots (investments only).
 CREATE TABLE IF NOT EXISTS monthly_net_worth (
   id BIGSERIAL PRIMARY KEY,
   month DATE NOT NULL UNIQUE,

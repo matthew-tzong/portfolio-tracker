@@ -42,35 +42,30 @@ This document explains how we detect broken connections (Plaid items and Snaptra
   - If this fails → Apply 2-strike
   - If this succeeds → All connections marked as `"OK"`
 
-**Note**: Snaptrade doesn't provide per-connection status codes, so we use heuristics:
+**Note**: Snaptrade doesn't provide per-connection status codes, so we do the following:
 - If we can't list connections at all → likely user authentication issue
 - If we can list connections but can't fetch accounts → connections may be broken
 
 ## Integration with Cron Jobs (Slice 7)
 
-When implementing the cron job (`POST /api/cron/daily-sync`), use **get data first, status check only on error** so we don’t do extra API calls when everything works.
+The nightly cron job (`POST /api/cron/daily-sync`) is responsible both for syncing data (transactions and portfolio snapshots) and for keeping connection statuses up to date.
 
 ### Plaid
 
-1. **Get data**: For each Plaid item, run cursor-based transaction sync (e.g. to end of book).
-2. **Only on error**: If sync fails for an item, then run status check for that item (or all items) and update DB.
-   - Use `checkAndUpdatePlaidItemStatuses(ctx, db, plaidClient)` when any item’s sync fails, so we mark auth-broken items as `ITEM_LOGIN_REQUIRED`.
-   - Alternatively, for only the failed item, call `plaidClient.GetItem` and if it’s a `PlaidConnectionError` with `IsAuthError`, upsert that item’s status.
-
-So: try sync → on success, done; on failure → call status check and persist status.
+1. **Webhook path**: When Plaid sends `SYNC_UPDATES_AVAILABLE`, the webhook handler marks the corresponding item as having `new_transactions_pending = true`.
+2. **Cron sync**: The cron handler looks up items with `new_transactions_pending = true` and runs cursor-based `/transactions/sync` for each via `SyncTransactionsForItem`, upserting new/updated transactions, deleting removed ones, updating the cursor, and clearing the pending flag.
+3. **Status refresh**: As part of the same cron run, `checkAndUpdatePlaidItemStatuses(ctx, db, plaidClient)` is called to refresh item statuses in the database so the Link Management UI shows up-to-date broken vs OK states.
 
 ### Snaptrade
 
-1. **Get data**: Call `ListConnections` and `ListAccounts`, then write daily snapshots (and optionally set all connections to `OK` in DB).
-2. **Only on error**: If `ListConnections` or `ListAccounts` fails, call `checkAndUpdateSnaptradeConnectionStatuses(ctx, db, snaptradeClient)` to apply the 2-strike logic and update connection statuses in the DB.
-
-So: try fetch + snapshots → on success, done (and connections stay/are set OK); on failure → run status check and persist status. Note: on the failure path, `checkAndUpdateSnaptradeConnectionStatuses` will call the Snaptrade API again; that’s acceptable so the same function can own the 2-strike logic.
+1. **Get data**: Cron calls `ListAccounts` / `ListAccountPositions` to fetch current balances and positions, then writes `daily_holdings` and `daily_snapshots` (and, on month-end, `monthly_snapshots`) into the database.
+2. **Status refresh**: The same cron run calls `checkAndUpdateSnaptradeConnectionStatuses(ctx, db, snaptradeClient)` to apply the 2-strike logic and update connection statuses in the DB.
 
 ### Summary
 
-- **Plaid**: Sync transactions first; only if sync fails, run `checkAndUpdatePlaidItemStatuses` (or per-item GetItem + status update).
-- **Snaptrade**: Fetch connections/accounts and write snapshots first; only if that fails, run `checkAndUpdateSnaptradeConnectionStatuses`.
-- Status-check helpers in `status_check.go` are used only on the error path, so normal runs don’t add extra Plaid GetItem or Snaptrade list calls.
+- **Plaid**: Webhooks mark items with new transactions; nightly cron runs cursor-based `/transactions/sync` for those items and then calls `checkAndUpdatePlaidItemStatuses` to keep statuses in sync.
+- **Snaptrade**: Nightly cron fetches accounts/positions, writes snapshots, and then calls `checkAndUpdateSnaptradeConnectionStatuses` to keep connection statuses up to date using the 2-strike system.
+- Status-check helpers in `status_check.go` are invoked from cron (and can be reused on error paths elsewhere if needed); there is no on-demand status check triggered directly from the UI.
 
 ## Reconnection Flow
 
@@ -114,10 +109,10 @@ So: try fetch + snapshots → on success, done (and connections stay/are set OK)
 
 ### Plaid - Webhooks Handle This
 
-**Plaid uses webhooks as the primary data source:**
-- When new transactions are available, Plaid sends a webhook (`SYNC_UPDATES_AVAILABLE`)
-- Webhook triggers transaction sync immediately
-- Nightly cron is just a **safety check** to catch anything webhooks missed
+**Plaid uses webhooks to tell us which items had new transactions; the nightly cron actually performs the sync:**
+- When new transactions are available, Plaid sends a webhook (`SYNC_UPDATES_AVAILABLE`).
+- The webhook handler marks that Plaid item as `new_transactions_pending = true`.
+- The nightly cron job then runs cursor-based `/transactions/sync` for items with `new_transactions_pending` and advances the cursor. There is no immediate sync from the webhook itself.
 
 **If an item is broken:**
 - Webhooks won't fire for that item
@@ -158,27 +153,7 @@ Two helper functions in `backend/internal/server/status_check.go`:
    - Updates status in database based on API success/failure
    - Can be called from cron jobs or manually
 
-These functions are used **only on the error path** in the cron job (Slice 7): we try to get data first (Plaid transaction sync, Snaptrade fetch + snapshots); only if that fails do we call these helpers to update connection status. There is no on-demand status check from the UI.
-
-## Error Classification
-
-### Plaid Error Types
-
-**Authentication Errors** (mark as broken immediately):
-- `ITEM_LOGIN_REQUIRED`
-- `INVALID_ACCESS_TOKEN`
-- `ACCESS_TOKEN_EXPIRED`
-- `ACCESS_TOKEN_INVALID`
-- `ITEM_ERROR`
-
-**Transient Errors** (don't mark as broken, allow retry):
-- `RATE_LIMIT_EXCEEDED` (if not auth-related)
-- `INSTITUTION_DOWN`
-- `TIMEOUT`
-- `INTERNAL_SERVER_ERROR`
-- Network errors (connection refused, DNS, etc.)
-
-**Unknown Errors**: Treated conservatively as authentication errors
+In the current implementation, the nightly cron job always calls these helpers to keep statuses fresh; they can also be reused on error paths if needed. There is no on-demand status check from the UI.
 
 ### Snaptrade Error Handling - 2-Strike System
 

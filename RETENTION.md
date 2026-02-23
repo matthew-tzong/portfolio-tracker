@@ -31,15 +31,14 @@ To keep the database within free tier limits while preserving long-term summarie
 
 - **Retention**: Keep daily snapshots (`daily_snapshots`) and holdings (`daily_holdings`) for the **last 30 days only**
 - **Before deletion**:
-  - If deleting a day that is the last day of a month, ensure monthly snapshot exists for that month
-  - Export daily snapshots/holdings as CSV before deletion
+  - If deleting a day that is the last day of a month, ensure a `monthly_snapshots` row exists for that month (per account)
 - **Monthly rollup**: 
   - End-of-month values are written to `monthly_snapshots` (per account)
   - Daily data older than 30 days is deleted
 
 **Example**:
-- On February 1, 2026, daily snapshots from January 1, 2026 and earlier are deleted
-- If January 31, 2026 is being deleted, ensure monthly snapshot for January 2026 exists first
+- On February 1, 2026, daily snapshots and holdings older than **30 days** are deleted
+- If a deleted day is the last day of a month (e.g., January 31, 2026), ensure a monthly snapshot for that month exists first
 
 ### Portfolio Monthly Snapshots
 
@@ -58,13 +57,11 @@ To keep the database within free tier limits while preserving long-term summarie
 
 ## Export-Before-Delete
 
-All data being pruned is exported as CSV before deletion. The retention job emails the CSV to the user (using **Resend**, free tier) before deleting:
+All data being pruned is exported as CSV before deletion. The retention job emails the CSV to the user (using **Resend**) before deleting:
 
-1. **Transactions**: On the 1st of each month, the month that is exactly 1 year old is exported as CSV, emailed to `ALLOWED_USER_EMAIL`, then that month's transactions are deleted.
-2. **Daily snapshots**: No email (daily data rolls into monthly); when the day being deleted is month-end, a monthly snapshot is written first, then daily data older than 30 days is deleted.
+1. **Transactions**: On the 1st of each month, the month that is exactly 1 year old is exported as CSV and emailed, then that month's transactions are deleted.
+2. **Daily snapshots**: No CSV export or email (daily data rolls into monthly); when the day being deleted is month-end, a monthly snapshot is written first, then daily data older than 30 days is deleted.
 3. **Monthly snapshots**: On Dec 31, the previous year's monthly snapshots are exported as CSV, emailed, then that year's monthly rows are deleted.
-
-Requires `RESEND_API_KEY` (and optionally `RESEND_FROM`). If `RESEND_API_KEY` is not set, retention still runs but no email is sent.
 
 ## Manual Export
 
@@ -80,9 +77,10 @@ Users can export data on demand via the UI:
 The nightly cron job (`POST /api/cron/daily-sync`) runs retention logic:
 
 1. **Transaction retention**: 
-   - Find months older than 1 year
-   - Create monthly expense summaries for those months
-   - Delete transactions older than 1 year
+   - Find the month that is exactly 1 year old
+   - Build a transactions CSV for that month and, if `RESEND_API_KEY` is set, email it
+   - Create/update monthly and yearly expense summaries as needed
+   - Delete that month's transactions
 
 2. **Daily snapshot retention**:
    - Delete daily snapshots/holdings older than 30 days
