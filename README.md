@@ -129,9 +129,4 @@
   - API routes are thin: they validate auth, call services, and return JSON.
   - The repo includes GitHub Actions CI that runs Go tests, frontend tests, lint, and build on each push.
 
-- **Backend**: Go (HTTP server with JWT auth)
-- **Frontend**: React + TypeScript + Vite
-- **Database & Auth**: Supabase (Postgres + Auth)
-- **Deploy**: Single deploy (Go serves React build)
-
 For implementation details and the step‑by‑step vertical slices that shaped the app, see `TODO.md`,  `RETENTION.md`, `STATUS_CHECKING.md` and `.cursorrules`.
