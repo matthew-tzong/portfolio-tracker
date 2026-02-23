@@ -21,9 +21,7 @@
   - Expenses by category.
   - Budget vs. actual spend.
 - **Automatically prunes old data** while exporting it as CSV first, so the database stays small but long‑term summaries remain available.
-
-The result is a single, private dashboard that answers: *“What is my net worth, where is my money going, and how is my portfolio doing?”*
-
+  
 ---
 
 ## Key features
