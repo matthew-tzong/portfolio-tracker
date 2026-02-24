@@ -204,13 +204,13 @@ func handleExchangePlaidPublicToken(w http.ResponseWriter, r *http.Request, deps
 
 	now := time.Now().UTC()
 
-	// Check if an item with the same institution_id already exists (for reconnection).
+	// Check if an item with the same institution_id already exists (for reconnection / rotation).
 	var existingItem *database.PlaidItem
 	if req.InstitutionID != "" {
 		existingItem, _ = deps.db.GetPlaidItemByInstitutionID(r.Context(), req.InstitutionID)
 	}
 
-	// Build the Plaid item for the database.
+	// Build the Plaid item fields for the database.
 	item := &database.PlaidItem{
 		ItemID:      itemID,
 		AccessToken: accessToken,
@@ -224,16 +224,30 @@ func handleExchangePlaidPublicToken(w http.ResponseWriter, r *http.Request, deps
 		item.InstitutionID = &req.InstitutionID
 	}
 
-	// If item existed, delete the old item and update accounts to point to the new item_id.
-	if existingItem != nil && existingItem.ItemID != itemID {
-		_ = deps.db.DeletePlaidItem(r.Context(), existingItem.ItemID)
-	}
+	// If an item already exists for this institution, drop existing account and update the item.
+	if existingItem != nil {
+		_ = deps.db.DeletePlaidAccountsByItemID(r.Context(), existingItem.ItemID)
 
-	// Save item to DB (upsert by item_id)
-	err = deps.db.UpsertPlaidItem(r.Context(), item)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to save Plaid item: "+err.Error())
-		return
+		err = deps.db.UpdatePlaidItemAfterReconnect(
+			r.Context(),
+			existingItem,
+			itemID,
+			accessToken,
+			"OK",
+			now,
+			item.InstitutionID,
+			item.InstitutionName,
+		)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to update Plaid item: "+err.Error())
+			return
+		}
+	} else {
+		err = deps.db.UpsertPlaidItem(r.Context(), item)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to save Plaid item: "+err.Error())
+			return
+		}
 	}
 
 	// Build the Plaid accounts for the database.

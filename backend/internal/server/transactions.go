@@ -168,6 +168,32 @@ func SyncTransactionsForItem(ctx context.Context, db *database.Client, plaidClie
 	return db.UpdatePlaidItemCursorAndPending(ctx, item.ItemID, cursor, false)
 }
 
+// pfcPrimaryToPlaidName maps Plaid's category names to our category names.
+func pfcPrimaryToPlaidName(primary string) string {
+	m := map[string]string{
+		"BANK_FEES":                "Bank Fees",
+		"FOOD_AND_DRINK":           "Food and Drink",
+		"GENERAL_MERCHANDISE":      "Shops",
+		"TRAVEL":                   "Travel",
+		"TRANSPORTATION":           "Travel",
+		"TRANSFER_IN":              "Transfer",
+		"TRANSFER_OUT":             "Transfer",
+		"ENTERTAINMENT":            "Recreation",
+		"GENERAL_SERVICES":         "Service",
+		"HOME_IMPROVEMENT":         "Service",
+		"RENT_AND_UTILITIES":       "Rent and Utilities",
+		"MEDICAL":                  "Healthcare",
+		"PERSONAL_CARE":            "Personal",
+		"GOVERNMENT_AND_NON_PROFIT": "Government and Non-Profit",
+		"INCOME":                   "Income",
+		"LOAN_PAYMENTS":            "Payment",
+	}
+	if name, ok := m[primary]; ok {
+		return name
+	}
+	return ""
+}
+
 // Converts a Plaid transaction to our DB model.
 func plaidTransactionToDB(p plaid.PlaidTransaction, plaidNameToCategoryID map[string]int64, uncategorizedID int64, rules []database.CategoryRule) database.Transaction {
 	// Sets up transaction fields.
@@ -189,13 +215,21 @@ func plaidTransactionToDB(p plaid.PlaidTransaction, plaidNameToCategoryID map[st
 		}
 	}
 	if categoryID == nil {
+		primaryName := ""
 		if len(p.Category) > 0 {
-			primary := p.Category[0]
-			if id, ok := plaidNameToCategoryID[primary]; ok {
+			primaryName = p.Category[0]
+		} else if p.PersonalFinanceCategory != nil && p.PersonalFinanceCategory.Primary != "" {
+
+			primaryName = pfcPrimaryToPlaidName(p.PersonalFinanceCategory.Primary)
+		}
+		if primaryName != "" {
+			if id, ok := plaidNameToCategoryID[primaryName]; ok {
 				categoryID = &id
 			} else {
 				categoryID = &uncategorizedID
 			}
+		} else {
+			categoryID = &uncategorizedID
 		}
 	}
 
@@ -204,7 +238,7 @@ func plaidTransactionToDB(p plaid.PlaidTransaction, plaidNameToCategoryID map[st
 	return database.Transaction{
 		PlaidAccountID:     p.AccountID,
 		PlaidTransactionID: p.TransactionID,
-		Date:               date,
+		Date:               database.DateOnly{Time: date},
 		AmountCents:        amountCents,
 		Name:               p.Name,
 		MerchantName:       p.MerchantName,

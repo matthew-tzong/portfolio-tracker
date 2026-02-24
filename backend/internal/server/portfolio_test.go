@@ -28,9 +28,9 @@ func TestAggregateMonthlySnapshotsSumsByMonth(t *testing.T) {
 	month2 := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
 
 	allMonthly := []database.MonthlySnapshot{
-		{Month: month1, AccountID: "acc-1", PortfolioValueCents: 100},
-		{Month: month1, AccountID: "acc-2", PortfolioValueCents: 150},
-		{Month: month2, AccountID: "acc-1", PortfolioValueCents: 200},
+		{Month: database.DateOnly{Time: month1}, AccountID: "acc-1", PortfolioValueCents: 100},
+		{Month: database.DateOnly{Time: month1}, AccountID: "acc-2", PortfolioValueCents: 150},
+		{Month: database.DateOnly{Time: month2}, AccountID: "acc-1", PortfolioValueCents: 200},
 	}
 
 	points := aggregateMonthlySnapshotsForTest(allMonthly)
@@ -72,7 +72,7 @@ func TestBuildPortfolioSnapshotsCSVIncludesHeadersAndRows(t *testing.T) {
 	month1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 
 	snapshots := []database.MonthlySnapshot{
-		{Month: month1, AccountID: "acc-1", PortfolioValueCents: 12345},
+		{Month: database.DateOnly{Time: month1}, AccountID: "acc-1", PortfolioValueCents: 12345},
 	}
 
 	data, err := BuildPortfolioSnapshotsCSV(snapshots)

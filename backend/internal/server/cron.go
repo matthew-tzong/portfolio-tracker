@@ -144,7 +144,7 @@ func writeSnaptradeSnapshotsForToday(r *http.Request, deps apiDependencies) (boo
 		// Loops through the positions and adds them to the daily holdings.
 		for _, pos := range positions {
 			holding := &database.DailyHolding{
-				Date:       today,
+				Date:       database.DateOnly{Time: today},
 				AccountID:  account.ID,
 				Symbol:     pos.Symbol,
 				Quantity:   pos.Quantity,
@@ -156,7 +156,7 @@ func writeSnaptradeSnapshotsForToday(r *http.Request, deps apiDependencies) (boo
 
 	// Writes today's total portfolio snapshot.
 	snapshot := &database.DailySnapshot{
-		Date:                today,
+		Date:                database.DateOnly{Time: today},
 		PortfolioValueCents: totalPortfolioCents,
 	}
 	err = deps.db.UpsertDailySnapshot(r.Context(), snapshot)
@@ -197,7 +197,7 @@ func maybeWriteMonthlySnapshots(r *http.Request, deps apiDependencies, today tim
 	// Loops through the accounts and writes the monthly snapshots.
 	for accountID, total := range accountTotals {
 		snapshot := &database.MonthlySnapshot{
-			Month:               monthStart,
+			Month:               database.DateOnly{Time: monthStart},
 			AccountID:           accountID,
 			PortfolioValueCents: total,
 		}
@@ -237,7 +237,7 @@ func maybeWriteMonthlyNetWorth(r *http.Request, deps apiDependencies, today time
 	monthStart := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	snapshot := &database.MonthlyNetWorth{
-		Month:            monthStart,
+		Month:            database.DateOnly{Time: monthStart},
 		NetWorthCents:    netWorthCents,
 		CashCents:        cashCents,
 		InvestmentsCents: investmentsCents,
@@ -301,7 +301,7 @@ func runRetentionJob(ctx context.Context, deps apiDependencies) error {
 			}
 			for accountID, total := range accountTotals {
 				monthlySnapshot := &database.MonthlySnapshot{
-					Month:               monthStart,
+					Month:               database.DateOnly{Time: monthStart},
 					AccountID:           accountID,
 					PortfolioValueCents: total,
 				}
@@ -385,7 +385,7 @@ func createMonthlyExpenseSummary(ctx context.Context, deps apiDependencies, mont
 	// Upsert monthly expense summaries.
 	for categoryID, total := range categoryTotals {
 		summary := &database.MonthlyExpenseSummary{
-			Month:            month,
+			Month:            database.DateOnly{Time: month},
 			CategoryID:       categoryID,
 			TotalCents:       total,
 			TransactionCount: categoryCounts[categoryID],

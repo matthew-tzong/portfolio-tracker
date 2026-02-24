@@ -14,6 +14,38 @@ import (
 	"time"
 )
 
+// Represents a DATE column in Postgres.
+type DateOnly struct {
+	time.Time
+}
+
+// Parses either a full RFC3339 timestamp or a date-only string (YYYY-MM-DD).
+func (d *DateOnly) UnmarshalJSON(b []byte) error {
+	s := strings.Trim(string(b), `"`)
+	if s == "" || s == "null" {
+		return nil
+	}
+
+	// Try full RFC3339 first (e.g. "2006-01-02T15:04:05Z07:00").
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		d.Time = t
+		return nil
+	}
+
+	// Fallback to date-only layout used by DATE columns.
+	t, err := time.Parse("2006-01-02", s)
+	if err != nil {
+		return fmt.Errorf("invalid date %q: %w", s, err)
+	}
+	d.Time = t
+	return nil
+}
+
+// Returns a date-only string (YYYY-MM-DD) for DATE columns.
+func (d DateOnly) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.Time.Format("2006-01-02"))
+}
+
 // Supabase client for database operations.
 type Client struct {
 	httpClient *http.Client
@@ -64,7 +96,13 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body interfa
 	req.Header.Set("apikey", c.apiKey)
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Prefer", "return=representation")
+	// PostgREST (Supabase REST) requires resolution=merge-duplicates for true upserts.
+	// We only add it when the request is clearly an upsert (POST + on_conflict=...).
+	prefer := "return=representation"
+	if method == http.MethodPost && strings.Contains(url, "on_conflict=") {
+		prefer += ",resolution=merge-duplicates"
+	}
+	req.Header.Set("Prefer", prefer)
 
 	return c.httpClient.Do(req)
 }
@@ -97,6 +135,66 @@ func (c *Client) UpsertPlaidItem(ctx context.Context, item *PlaidItem) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("supabase upsert plaid_items failed: %s", string(body))
+	}
+	return nil
+}
+
+// Updates only the status and last_updated fields for an existing Plaid item by item_id.
+func (c *Client) UpdatePlaidItemStatus(ctx context.Context, itemID, status string, lastUpdated time.Time) error {
+	if itemID == "" {
+		return errors.New("plaid item_id must be non-empty for status update")
+	}
+
+	payload := map[string]interface{}{
+		"status":       status,
+		"last_updated": lastUpdated,
+	}
+
+	url := c.restURL("plaid_items") + "?item_id=eq." + url.QueryEscape(itemID)
+	resp, err := c.doRequest(ctx, http.MethodPatch, url, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase update plaid_item status failed: %s", string(body))
+	}
+	return nil
+}
+
+// Updates core fields on an existing Plaid item after reconnect/rotation.
+func (c *Client) UpdatePlaidItemAfterReconnect(ctx context.Context, existing *PlaidItem, newItemID, accessToken, status string, lastUpdated time.Time, institutionID, institutionName *string) error {
+	if existing == nil {
+		return errors.New("existing plaid item is nil")
+	}
+
+	// Creates the payload for the update.
+	payload := map[string]interface{}{
+		"item_id":      newItemID,
+		"access_token": accessToken,
+		"status":       status,
+		"last_updated": lastUpdated,
+	}
+	if institutionID != nil {
+		payload["institution_id"] = *institutionID
+	}
+	if institutionName != nil {
+		payload["institution_name"] = *institutionName
+	}
+
+	// Patch by primary key id to avoid conflicts on item_id uniqueness.
+	url := c.restURL("plaid_items") + "?id=eq." + fmt.Sprintf("%d", existing.ID)
+	resp, err := c.doRequest(ctx, http.MethodPatch, url, payload)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("supabase update plaid_item after reconnect failed: %s", string(body))
 	}
 	return nil
 }
@@ -674,8 +772,8 @@ func (c *Client) UpsertBudget(ctx context.Context, budget *Budget) error {
 		return errors.New("budget is nil")
 	}
 
-	url := c.restURL("budgets") + "?on_conflict=id"
-	resp, err := c.doRequest(ctx, http.MethodPost, url, budget)
+	url := c.restURL("budgets") + "?id=eq." + fmt.Sprintf("%d", budget.ID)
+	resp, err := c.doRequest(ctx, http.MethodPatch, url, budget)
 	if err != nil {
 		return err
 	}
@@ -1261,15 +1359,15 @@ type CategoryRule struct {
 
 // Represents a row in the transactions table.
 type Transaction struct {
-	ID                 int64     `json:"id,omitempty"`
-	PlaidAccountID     string    `json:"plaid_account_id"`
-	PlaidTransactionID string    `json:"plaid_transaction_id"`
-	Date               time.Time `json:"date"`
-	AmountCents        int64     `json:"amount_cents"`
-	Name               string    `json:"name"`
-	MerchantName       *string   `json:"merchant_name,omitempty"`
-	CategoryID         *int64    `json:"category_id,omitempty"`
-	Pending            bool      `json:"pending"`
+	ID                 int64    `json:"id,omitempty"`
+	PlaidAccountID     string   `json:"plaid_account_id"`
+	PlaidTransactionID string   `json:"plaid_transaction_id"`
+	Date               DateOnly `json:"date"`
+	AmountCents        int64    `json:"amount_cents"`
+	Name               string   `json:"name"`
+	MerchantName       *string  `json:"merchant_name"`
+	CategoryID         *int64   `json:"category_id"`
+	Pending            bool     `json:"pending"`
 	CreatedAt          time.Time `json:"created_at,omitempty"`
 	UpdatedAt          time.Time `json:"updated_at,omitempty"`
 }
@@ -1290,50 +1388,50 @@ type Budget struct {
 
 // Represents a row in the daily_snapshots table
 type DailySnapshot struct {
-	ID                  int64     `json:"id,omitempty"`
-	Date                time.Time `json:"date"`
-	PortfolioValueCents int64     `json:"portfolio_value_cents"`
+	ID                  int64    `json:"id,omitempty"`
+	Date                DateOnly `json:"date"`
+	PortfolioValueCents int64    `json:"portfolio_value_cents"`
 	CreatedAt           time.Time `json:"created_at,omitempty"`
 }
 
 // Represents a row in the daily_holdings table.
 type DailyHolding struct {
-	ID         int64     `json:"id,omitempty"`
-	Date       time.Time `json:"date"`
-	AccountID  string    `json:"account_id"`
-	Symbol     string    `json:"symbol"`
-	Quantity   float64   `json:"quantity"`
-	ValueCents int64     `json:"value_cents"`
+	ID         int64    `json:"id,omitempty"`
+	Date       DateOnly `json:"date"`
+	AccountID  string   `json:"account_id"`
+	Symbol     string   `json:"symbol"`
+	Quantity   float64  `json:"quantity"`
+	ValueCents int64    `json:"value_cents"`
 	CreatedAt  time.Time `json:"created_at,omitempty"`
 }
 
 // Represents a row in the monthly_snapshots table.
 type MonthlySnapshot struct {
-	ID                  int64     `json:"id,omitempty"`
-	Month               time.Time `json:"month"`
-	AccountID           string    `json:"account_id"`
-	PortfolioValueCents int64     `json:"portfolio_value_cents"`
+	ID                  int64    `json:"id,omitempty"`
+	Month               DateOnly `json:"month"`
+	AccountID           string   `json:"account_id"`
+	PortfolioValueCents int64    `json:"portfolio_value_cents"`
 	CreatedAt           time.Time `json:"created_at,omitempty"`
 }
 
 // Represents a row in the monthly_net_worth table.
 type MonthlyNetWorth struct {
-	ID               int64     `json:"id,omitempty"`
-	Month            time.Time `json:"month"`
-	NetWorthCents    int64     `json:"net_worth_cents"`
-	CashCents        int64     `json:"cash_cents"`
-	InvestmentsCents int64     `json:"investments_cents"`
-	LiabilitiesCents int64     `json:"liabilities_cents"`
+	ID               int64    `json:"id,omitempty"`
+	Month            DateOnly `json:"month"`
+	NetWorthCents    int64    `json:"net_worth_cents"`
+	CashCents        int64    `json:"cash_cents"`
+	InvestmentsCents int64    `json:"investments_cents"`
+	LiabilitiesCents int64    `json:"liabilities_cents"`
 	CreatedAt        time.Time `json:"created_at,omitempty"`
 }
 
 // Represents a row in the monthly_expense_summary table.
 type MonthlyExpenseSummary struct {
-	ID               int64     `json:"id,omitempty"`
-	Month            time.Time `json:"month"`
-	CategoryID       int64     `json:"category_id"`
-	TotalCents       int64     `json:"total_cents"`
-	TransactionCount int       `json:"transaction_count"`
+	ID               int64    `json:"id,omitempty"`
+	Month            DateOnly `json:"month"`
+	CategoryID       int64    `json:"category_id"`
+	TotalCents       int64    `json:"total_cents"`
+	TransactionCount int      `json:"transaction_count"`
 	CreatedAt        time.Time `json:"created_at,omitempty"`
 }
 

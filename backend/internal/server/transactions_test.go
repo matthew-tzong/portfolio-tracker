@@ -88,6 +88,41 @@ func TestPlaidTransactionToDB_FallsBackToPlaidPrimaryOrUncategorized(t *testing.
 	}
 }
 
+func TestPlaidTransactionToDB_UsesPersonalFinanceCategoryWhenLegacyCategoryEmpty(t *testing.T) {
+	categoryFood := int64(20)
+	categoryUncategorized := int64(21)
+	plaidNameToCategoryID := map[string]int64{
+		"Food and Drink": categoryFood,
+	}
+	rules := []database.CategoryRule{}
+
+	// Plaid often returns only personal_finance_category; legacy category can be empty.
+	tx := plaid.PlaidTransaction{
+		AccountID:               "acc-1",
+		TransactionID:           "tx-1",
+		Amount:                  -25.00,
+		Date:                    "2024-01-01",
+		Name:                    "Whole Foods",
+		Category:                nil,
+		PersonalFinanceCategory: &plaid.PersonalFinanceCategory{Primary: "FOOD_AND_DRINK"},
+		Pending:                 false,
+	}
+	result := plaidTransactionToDB(tx, plaidNameToCategoryID, categoryUncategorized, rules)
+	if result.CategoryID == nil || *result.CategoryID != categoryFood {
+		t.Fatalf("expected category %d from PFC FOOD_AND_DRINK, got %#v", categoryFood, result.CategoryID)
+	}
+
+	// No category at all -> Uncategorized.
+	txNoCat := plaid.PlaidTransaction{
+		AccountID: "acc-1", TransactionID: "tx-2", Amount: -5, Date: "2024-01-02", Name: "Unknown",
+		Category: nil, PersonalFinanceCategory: nil, Pending: false,
+	}
+	resultNoCat := plaidTransactionToDB(txNoCat, plaidNameToCategoryID, categoryUncategorized, rules)
+	if resultNoCat.CategoryID == nil || *resultNoCat.CategoryID != categoryUncategorized {
+		t.Fatalf("expected uncategorized %d when no Plaid category, got %#v", categoryUncategorized, resultNoCat.CategoryID)
+	}
+}
+
 func TestCalculateMonthlySpentByCategoryFromData(t *testing.T) {
 	categoryGroceries := database.Category{
 		ID:        1,
@@ -105,21 +140,21 @@ func TestCalculateMonthlySpentByCategoryFromData(t *testing.T) {
 	transactions := []database.Transaction{
 		{
 			ID:          1,
-			Date:        time.Now(),
+			Date:        database.DateOnly{Time: time.Now()},
 			AmountCents: -5000,
 			Name:        "Grocery Store",
 			CategoryID:  int64Ptr(categoryGroceries.ID),
 		},
 		{
 			ID:          2,
-			Date:        time.Now(),
+			Date:        database.DateOnly{Time: time.Now()},
 			AmountCents: 3000,
 			Name:        "Refund from Grocery Store",
 			CategoryID:  int64Ptr(categoryGroceries.ID),
 		},
 		{
 			ID:          3,
-			Date:        time.Now(),
+			Date:        database.DateOnly{Time: time.Now()},
 			AmountCents: 10000,
 			Name:        "Paycheck",
 			CategoryID:  int64Ptr(categoryIncome.ID),

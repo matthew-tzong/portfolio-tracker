@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"slices"
@@ -162,10 +163,16 @@ func (c *Client) postJSON(ctx context.Context, path string, input, output interf
 	}
 	defer resp.Body.Close()
 
-	// Checks the status code of the response.
+	// Read the entire response body to inspect for errors
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+
+	// Non-2xx: standard Plaid error envelope.
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		var plaidErr plaidErrorResponse
-		_ = json.NewDecoder(resp.Body).Decode(&plaidErr)
+		_ = json.Unmarshal(bodyBytes, &plaidErr)
 		if plaidErr.ErrorMessage != "" {
 			return &PlaidConnectionError{
 				ErrorCode:    plaidErr.ErrorCode,
@@ -181,9 +188,20 @@ func (c *Client) postJSON(ctx context.Context, path string, input, output interf
 		}
 	}
 
-	// Decodes the response body into the output.
+	// Checks if the response is an error envelope (top-level only).
 	if output != nil {
-		return json.NewDecoder(resp.Body).Decode(output)
+		var plaidErr plaidErrorResponse
+		if err := json.Unmarshal(bodyBytes, &plaidErr); err == nil && plaidErr.ErrorCode != "" {
+			return &PlaidConnectionError{
+				ErrorCode:    plaidErr.ErrorCode,
+				ErrorMessage: plaidErr.ErrorMessage,
+				ErrorType:    plaidErr.ErrorType,
+				IsAuthError:  isPlaidAuthError(plaidErr.ErrorCode),
+			}
+		}
+
+		// Normal success path: decode into the expected response struct.
+		return json.Unmarshal(bodyBytes, output)
 	}
 	return nil
 }
@@ -195,11 +213,18 @@ func (e *PlaidConnectionError) Error() string {
 
 // Determines if a Plaid error code indicates authentication/reconnection is needed.
 func isPlaidAuthError(errorCode string) bool {
+	return IsAuthErrorCode(errorCode)
+}
+
+// IsAuthErrorCode reports whether the Plaid error code indicates the item needs reconnection (e.g. ITEM_LOGIN_REQUIRED).
+// Use this when handling embedded item.error in 200 responses from GetItem.
+func IsAuthErrorCode(errorCode string) bool {
 	authErrorCodes := []string{
 		"ITEM_LOGIN_REQUIRED",
 		"INVALID_ACCESS_TOKEN",
 		"ACCESS_TOKEN_EXPIRED",
 		"ACCESS_TOKEN_INVALID",
+		"NOT_FOUND",
 	}
 	return slices.Contains(authErrorCodes, errorCode)
 }
@@ -329,9 +354,10 @@ type PlaidConnectionError struct {
 
 // Plaid item status information.
 type ItemStatus struct {
-	ItemID                string  `json:"item_id"`
-	Status                string  `json:"status"`
-	ConsentExpirationTime *string `json:"consent_expiration_time,omitempty"`
+	ItemID                string              `json:"item_id"`
+	Status                string              `json:"status"`
+	ConsentExpirationTime *string             `json:"consent_expiration_time,omitempty"`
+	Error                 *plaidErrorResponse `json:"error,omitempty"`
 }
 
 // Plaid Item Status response from Plaid.
@@ -360,17 +386,24 @@ type TransactionsSyncResult struct {
 	HasMore    bool
 }
 
+// PersonalFinanceCategory is Plaid's current categorization (returned by /transactions/sync).
+type PersonalFinanceCategory struct {
+	Primary string `json:"primary"`
+	Detailed string `json:"detailed,omitempty"`
+}
+
 // Transaction for transactions sync.
 type PlaidTransaction struct {
-	TransactionID string   `json:"transaction_id"`
-	AccountID     string   `json:"account_id"`
-	Amount        float64  `json:"amount"`
-	Date          string   `json:"date"`
-	Name          string   `json:"name"`
-	MerchantName  *string  `json:"merchant_name,omitempty"`
-	Category      []string `json:"category,omitempty"`
-	CategoryID    *string  `json:"category_id,omitempty"`
-	Pending       bool     `json:"pending"`
+	TransactionID            string                    `json:"transaction_id"`
+	AccountID                string                    `json:"account_id"`
+	Amount                   float64                   `json:"amount"`
+	Date                     string                    `json:"date"`
+	Name                     string                    `json:"name"`
+	MerchantName             *string                   `json:"merchant_name,omitempty"`
+	Category                 []string                  `json:"category,omitempty"`
+	CategoryID               *string                   `json:"category_id,omitempty"`
+	PersonalFinanceCategory  *PersonalFinanceCategory  `json:"personal_finance_category,omitempty"`
+	Pending                  bool                      `json:"pending"`
 }
 
 // Removed transaction for transactions sync.

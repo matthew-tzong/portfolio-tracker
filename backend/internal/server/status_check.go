@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"log"
 	"time"
 
 	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
@@ -31,9 +32,12 @@ func checkAndUpdatePlaidItemStatuses(ctx context.Context, db *database.Client, p
 			// Check if this is an authentication error (needs reconnection)
 			var plaidErr *plaid.PlaidConnectionError
 			if errors.As(err, &plaidErr) && plaidErr.IsAuthError {
-				items[i].Status = "ITEM_LOGIN_REQUIRED"
+				items[i].Status = plaidErr.ErrorCode
 				items[i].LastUpdated = now
-				_ = db.UpsertPlaidItem(ctx, &items[i])
+				err := db.UpdatePlaidItemStatus(ctx, items[i].ItemID, items[i].Status, items[i].LastUpdated); 
+				if err != nil {
+					log.Printf("status_check: update plaid item %s after auth error: %v", items[i].ItemID, err)
+				}
 			}
 			continue
 		}
@@ -42,11 +46,25 @@ func checkAndUpdatePlaidItemStatuses(ctx context.Context, db *database.Client, p
 			continue
 		}
 
-		// Update status if it changed
-		if items[i].Status != itemStatus.Status {
-			items[i].Status = itemStatus.Status
+		// GetItem returns 200 even with embedded item.error; parse and update status only for auth errors.
+		if itemStatus.Error != nil && plaid.IsAuthErrorCode(itemStatus.Error.ErrorCode) {
+			items[i].Status = itemStatus.Error.ErrorCode
 			items[i].LastUpdated = now
-			_ = db.UpsertPlaidItem(ctx, &items[i])
+			err := db.UpdatePlaidItemStatus(ctx, items[i].ItemID, items[i].Status, items[i].LastUpdated); 
+			if err != nil {
+				log.Printf("status_check: update plaid item %s after embedded auth error %s: %v", items[i].ItemID, itemStatus.Error.ErrorCode, err)
+			}
+			continue
+		}
+
+		// Healthy: no embedded auth error – mark as OK.
+		if items[i].Status != "OK" {
+			items[i].Status = "OK"
+			items[i].LastUpdated = now
+			err := db.UpdatePlaidItemStatus(ctx, items[i].ItemID, items[i].Status, items[i].LastUpdated); 
+			if err != nil {
+				log.Printf("status_check: update plaid item %s to OK: %v", items[i].ItemID, err)
+			}
 		}
 	}
 
