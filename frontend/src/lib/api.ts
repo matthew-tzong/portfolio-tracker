@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+const envApiUrl = import.meta.env.VITE_API_URL
+const API_URL = typeof envApiUrl === 'string' ? envApiUrl : 'http://localhost:8080'
 
 /*
  - Authenticated request to the Go backend (single-user app).
