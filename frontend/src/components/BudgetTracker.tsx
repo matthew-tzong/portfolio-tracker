@@ -74,7 +74,17 @@ export function BudgetTracker() {
       const res = await apiRequest<BudgetResponse>(`/api/budget?month=${encodeURIComponent(month)}`)
       const nextAllocations = res.allocations ?? {}
       setAllocations(nextAllocations)
-      setSpent(res.spent ?? {})
+
+      // Map data from name to ID
+      const spentByName = res.spent ?? {}
+      const spentById: Record<string, number> = {}
+      categories.forEach((cat) => {
+        if (cat.expense) {
+          const val = spentByName[cat.name] ?? 0
+          spentById[String(cat.id)] = Math.max(val, 0)
+        }
+      })
+      setSpent(spentById)
 
       // Computes the current budget allocations.
       const totalAllocatedCents = Object.values(nextAllocations).reduce(
@@ -89,7 +99,7 @@ export function BudgetTracker() {
     } finally {
       setLoading(false)
     }
-  }, [month])
+  }, [month, categories])
 
   // Loads the budget when the month changes.
   useEffect(() => {
@@ -385,10 +395,10 @@ export function BudgetTracker() {
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
                     ) -
-                      Object.values(spent).reduce(
-                        (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                        0,
-                      ),
+                    Object.values(spent).reduce(
+                      (sum, value) => sum + (typeof value === 'number' ? value : 0),
+                      0,
+                    ),
                   )}
                 </p>
               </div>

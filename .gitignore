@@ -14,3 +14,4 @@ frontend/.env.*
 CURRENT_STATE.md
 SUPABASE_SETUP.md
 local_test.md
+notes.md
