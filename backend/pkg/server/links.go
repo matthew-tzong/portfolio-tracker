@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/plaid"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/serverauth"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/snaptrade"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/plaid"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/serverauth"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Client dependencies for the link management routes.

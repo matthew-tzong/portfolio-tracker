@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/plaid"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/plaid"
 )
 
 func TestPlaidTransactionToDB_CategoryRuleTakesPrecedence(t *testing.T) {

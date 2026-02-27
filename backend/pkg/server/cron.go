@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/email"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/email"
 )
 
 // Cron Response.

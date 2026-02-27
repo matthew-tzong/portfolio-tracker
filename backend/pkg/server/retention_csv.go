@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 )
 
 // Builds CSV for the given month's transactions.

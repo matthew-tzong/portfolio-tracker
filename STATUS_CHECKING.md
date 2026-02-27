@@ -140,7 +140,7 @@ The nightly cron job (`POST /api/cron/daily-sync`) is responsible both for synci
 
 ## Helper Functions
 
-Two helper functions in `backend/internal/server/status_check.go`:
+Two helper functions in `backend/pkg/server/status_check.go`:
 
 1. **`checkAndUpdatePlaidItemStatuses()`**
    - Checks all Plaid items via Plaid API

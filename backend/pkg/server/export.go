@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/serverauth"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/serverauth"
 )
 
 // Registers export routes.

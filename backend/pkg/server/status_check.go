@@ -6,9 +6,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/plaid"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/snaptrade"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/plaid"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Checks and updates the status of all Plaid items.

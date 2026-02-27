@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/serverauth"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/snaptrade"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/serverauth"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Account View Model

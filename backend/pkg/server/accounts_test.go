@@ -3,8 +3,8 @@ package server
 import (
 	"testing"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/snaptrade"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 func TestIsPlaidLiability(t *testing.T) {

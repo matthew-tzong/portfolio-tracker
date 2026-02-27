@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 )
 
 func TestSortSnapshotDataPointsOrdersByDate(t *testing.T) {

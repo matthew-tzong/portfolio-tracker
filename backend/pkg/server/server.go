@@ -6,14 +6,35 @@ import (
 	"os"
 	"time"
 
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/database"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/plaid"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/serverauth"
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/snaptrade"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/plaid"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/serverauth"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Configures and starts the HTTP server with CORS support and protected routes.
 func Run() error {
+	handler, err := NewHandler()
+	if err != nil {
+		return err
+	}
+
+	port := getEnv("PORT", "8080")
+	server := &http.Server{
+		Addr:         ":" + port,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	log.Printf("backend listening on :%s", port)
+	return server.ListenAndServe()
+}
+
+// NewHandler creates and configures the HTTP handler for the application.
+// This is used both for local development and as the entry point for Vercel.
+func NewHandler() (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	// Initialize Supabase database client
@@ -54,61 +75,21 @@ func Run() error {
 		_, _ = w.Write([]byte(`{"message":"pong (protected)"}`))
 	})))
 
-	// Registers the link management routes.
-	registerLinkManagementRoutes(mux, apiDependencies{
+	deps := apiDependencies{
 		db:              dbClient,
 		plaidClient:     plaidClient,
 		snaptradeClient: snaptradeClient,
-	})
-
-	// Registers the accounts and net worth routes.
-	registerAccountsRoutes(mux, apiDependencies{
-		db:              dbClient,
-		plaidClient:     plaidClient,
-		snaptradeClient: snaptradeClient,
-	})
-
-	// Registers the transactions and webhook routes.
-	registerTransactionsRoutes(mux, apiDependencies{
-		db:              dbClient,
-		plaidClient:     plaidClient,
-		snaptradeClient: snaptradeClient,
-	})
-
-	// Registers the portfolio routes.
-	registerPortfolioRoutes(mux, apiDependencies{
-		db:              dbClient,
-		plaidClient:     plaidClient,
-		snaptradeClient: snaptradeClient,
-	})
-
-	// Registers the cron routes used by external schedulers.
-	registerCronRoutes(mux, apiDependencies{
-		db:              dbClient,
-		plaidClient:     plaidClient,
-		snaptradeClient: snaptradeClient,
-	})
-
-	// Registers the export routes.
-	registerExportRoutes(mux, apiDependencies{
-		db:              dbClient,
-		plaidClient:     plaidClient,
-		snaptradeClient: snaptradeClient,
-	})
-
-	handler := withCORS(mux)
-
-	port := getEnv("PORT", "8080")
-	server := &http.Server{
-		Addr:         ":" + port,
-		Handler:      handler,
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  60 * time.Second,
 	}
 
-	log.Printf("backend listening on :%s", port)
-	return server.ListenAndServe()
+	// Register all routes
+	registerLinkManagementRoutes(mux, deps)
+	registerAccountsRoutes(mux, deps)
+	registerTransactionsRoutes(mux, deps)
+	registerPortfolioRoutes(mux, deps)
+	registerCronRoutes(mux, deps)
+	registerExportRoutes(mux, deps)
+
+	return withCORS(mux), nil
 }
 
 // Adds CORS headers to responses, allowing the frontend origin to make requests.

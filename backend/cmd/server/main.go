@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/matthewtzong/portfolio-tracker/backend/internal/server"
+	"github.com/matthewtzong/portfolio-tracker/backend/pkg/server"
 	"log"
 	"os"
 )

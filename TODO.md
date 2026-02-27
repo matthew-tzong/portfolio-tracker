@@ -58,7 +58,7 @@ Each slice is a **vertical slice**: a complete end-to-end piece of value you can
   - [x] Go: for each Plaid item, call Plaid balances/accounts; upsert `plaid_accounts` in Supabase. For Snaptrade, fetch account balances and store or derive cash per account.
   - [x] Endpoint(s) to trigger sync and/or to return current accounts and balances (e.g. `GET /api/accounts`).
 - [x] **3.2 Net worth calculation (Go)**
-  - [x] Compute net worth = cash + investment value − liabilities. Put logic in `backend/internal/` or `backend/pkg/`; use from API handler.
+  - [x] Compute net worth = cash + investment value − liabilities. Put logic in `backend/pkg/` or `backend/pkg/`; use from API handler.
 - [x] **3.3 Dashboard UI (React)**
   - [x] Page or section: fetch accounts and net worth from Go API; list accounts (name, type, balance, mask); display net worth (single number or breakdown: cash, investments, liabilities).
 - [x] **3.4 Red alert and reconnect (Plaid + Snaptrade)**
