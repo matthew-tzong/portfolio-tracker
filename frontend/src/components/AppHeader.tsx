@@ -4,11 +4,12 @@ import { supabase } from '../lib/supabase'
 
 // CSS classes for the navigation links.
 const navLinkClass =
-  'py-2 px-3 text-sm font-medium rounded-md border focus:outline-none focus:ring-2 focus:ring-offset-2 min-w-[8.5rem] text-center inline-block'
+  'py-2 px-4 text-sm font-medium rounded-full border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background'
 
-const navLinkDefault = 'text-gray-700 bg-white border-gray-300 hover:bg-gray-50 focus:ring-gray-400'
+const navLinkDefault =
+  'text-zinc-400 bg-transparent border-transparent hover:text-zinc-100 hover:bg-white/5'
 
-const navLinkActive = 'text-blue-700 bg-blue-50 border-blue-200 ring-blue-400'
+const navLinkActive = 'text-primary bg-primary/10 border-primary/20 ring-primary/30'
 
 export function AppHeader() {
   const [user, setUser] = useState<{ email?: string } | null>(null)
@@ -25,14 +26,17 @@ export function AppHeader() {
 
   // Returns the app header.
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+    <header className="glass sticky top-0 z-50 border-x-0 border-t-0 border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-14">
-          <Link to="/dashboard" className="text-xl font-semibold text-gray-900 hover:text-gray-700">
+        <div className="flex justify-between items-center h-16">
+          <Link
+            to="/dashboard"
+            className="text-xl font-bold text-white hover:text-primary transition-colors"
+          >
             My portfolio
           </Link>
 
-          <nav className="flex items-center gap-2">
+          <nav className="flex items-center gap-1.5">
             <NavLink
               to="/dashboard"
               className={({ isActive: active }) =>
@@ -40,22 +44,6 @@ export function AppHeader() {
               }
             >
               Dashboard
-            </NavLink>
-            <NavLink
-              to="/expenses"
-              className={({ isActive: active }) =>
-                `${navLinkClass} ${active ? navLinkActive : navLinkDefault}`
-              }
-            >
-              Expense tracker
-            </NavLink>
-            <NavLink
-              to="/budget"
-              className={({ isActive: active }) =>
-                `${navLinkClass} ${active ? navLinkActive : navLinkDefault}`
-              }
-            >
-              Budget tracker
             </NavLink>
             <NavLink
               to="/portfolio"
@@ -66,6 +54,22 @@ export function AppHeader() {
               Portfolio
             </NavLink>
             <NavLink
+              to="/expenses"
+              className={({ isActive: active }) =>
+                `${navLinkClass} ${active ? navLinkActive : navLinkDefault}`
+              }
+            >
+              Expenses
+            </NavLink>
+            <NavLink
+              to="/budget"
+              className={({ isActive: active }) =>
+                `${navLinkClass} ${active ? navLinkActive : navLinkDefault}`
+              }
+            >
+              Budget
+            </NavLink>
+            <NavLink
               to="/links"
               className={({ isActive: active }) =>
                 `${navLinkClass} ${active ? navLinkActive : navLinkDefault}`
@@ -73,17 +77,20 @@ export function AppHeader() {
             >
               Connections
             </NavLink>
+            <div className="w-px h-6 bg-border mx-2" />
             <button
               type="button"
               onClick={handleSignOut}
-              className="py-2 px-4 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+              className="py-2 px-5 text-sm font-semibold text-background bg-zinc-100 rounded-full hover:bg-white transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-400 focus:ring-offset-2 focus:ring-offset-background"
             >
               Sign out
             </button>
           </nav>
         </div>
         {user?.email && (
-          <p className="text-xs text-gray-500 pb-2 -mt-1">Signed in as {user.email}</p>
+          <p className="text-[10px] text-zinc-500 pb-2 -mt-1 font-bold uppercase tracking-widest">
+            Signed in as {user.email}
+          </p>
         )}
       </div>
     </header>

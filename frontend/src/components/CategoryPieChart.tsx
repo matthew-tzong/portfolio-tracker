@@ -38,9 +38,9 @@ export function CategoryPieChart({ title, data, height = 260 }: CategoryPieChart
 
   return (
     <div className="w-full">
-      <h3 className="text-md font-medium text-gray-800 mb-2">{title}</h3>
-      <div style={{ width: '100%', height }}>
-        <ResponsiveContainer>
+      {title && <h3 className="text-md font-bold text-white mb-4">{title}</h3>}
+      <div style={{ width: '100%', minWidth: 0, minHeight: height }}>
+        <ResponsiveContainer width="100%" height={height}>
           <PieChart>
             <Pie
               data={nonZeroData}
@@ -55,12 +55,19 @@ export function CategoryPieChart({ title, data, height = 260 }: CategoryPieChart
                 <Cell
                   key={entry.name}
                   fill={COLORS[index % COLORS.length]}
-                  stroke="#FFFFFF"
-                  strokeWidth={1}
+                  stroke="#18181b"
+                  strokeWidth={2}
                 />
               ))}
             </Pie>
             <Tooltip
+              contentStyle={{
+                backgroundColor: '#18181b',
+                border: '1px solid #27272a',
+                borderRadius: '12px',
+                fontSize: '12px',
+                color: '#fff',
+              }}
               formatter={(value: unknown, name: unknown) =>
                 typeof value === 'number'
                   ? [formatCurrency(value), String(name)]

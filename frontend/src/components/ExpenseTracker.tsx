@@ -51,7 +51,7 @@ interface YearlyExpenseSummaryResponse {
   byCategory: YearlyExpenseCategory[]
 }
 
-const START_MONTH = '2026-02'
+const START_MONTH = '2026-03'
 const START_YEAR = 2026
 
 // Returns the current month in YYYY-MM.
@@ -258,17 +258,27 @@ export function ExpenseTracker() {
 
   // Returns the expense tracker page.
   return (
-    <div className="max-w-4xl mx-auto py-8 px-5">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Expense tracker</h1>
+    <div className="max-w-6xl mx-auto py-10 px-6">
+      <div className="flex justify-between items-center mb-10">
+        <h1 className="text-3xl font-bold text-white tracking-tight">Expense Tracker</h1>
+        <button
+          onClick={handleExportTransactions}
+          className="bg-primary text-background px-6 py-2.5 rounded-full text-sm font-bold hover:bg-green-400 transition-all shadow-lg active:scale-95"
+        >
+          Export CSV
+        </button>
+      </div>
 
-      <div className="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex flex-wrap items-end gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+      <div className="bg-card border border-border rounded-4xl p-8 shadow-2xl mb-8">
+        <div className="flex flex-wrap items-end gap-6 mb-8">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1">
+              Month
+            </label>
             <select
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="block w-40 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+              className="w-full bg-zinc-900 border border-border text-zinc-100 rounded-2xl px-5 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
             >
               {monthOptions.map((m) => (
                 <option key={m} value={m}>
@@ -277,14 +287,16 @@ export function ExpenseTracker() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1">
+              Category
+            </label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="block w-48 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+              className="w-full bg-zinc-900 border border-border text-zinc-100 rounded-2xl px-5 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
             >
-              <option value="">All</option>
+              <option value="">All Categories</option>
               {categories.map((c) => (
                 <option key={c.id} value={String(c.id)}>
                   {c.name}
@@ -292,140 +304,172 @@ export function ExpenseTracker() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Name or merchant"
-              className="block w-56 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
-            />
-          </div>
-          <div>
-            <button
-              type="button"
-              onClick={handleExportTransactions}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              Export CSV
-            </button>
+          <div className="flex-[1.5] min-w-[280px]">
+            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1">
+              Search
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Name or merchant..."
+                className="w-full bg-zinc-900 border border-border text-zinc-100 rounded-2xl px-5 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+              />
+            </div>
           </div>
         </div>
 
-        {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm font-medium">
+            {error}
+          </div>
+        )}
 
-        {/* Monthly summary: income, after expenses, invested, after investments */}
+        {/* Monthly summary cards */}
         {month && (
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <h3 className="text-sm font-semibold text-gray-800 mb-3">Month summary</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
             {summaryLoading ? (
-              <p className="text-sm text-gray-500">Loading summary…</p>
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-24 bg-zinc-800 animate-pulse rounded-3xl" />
+              ))
             ) : summary ? (
-              <dl className="space-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Income (before expenses)</dt>
-                  <dd className="font-medium text-green-700">
+              <>
+                <div className="bg-zinc-900 border border-border p-6 rounded-3xl group hover:border-green-500/30 transition-all">
+                  <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2 block">
+                    Income
+                  </span>
+                  <p className="text-2xl font-bold text-green-500 tracking-tight">
                     {formatCurrency(summary.incomeCents)}
-                  </dd>
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Expenses</dt>
-                  <dd className="font-medium text-red-700">
+                <div className="bg-zinc-900 border border-border p-6 rounded-3xl group hover:border-red-500/30 transition-all">
+                  <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2 block">
+                    Expenses
+                  </span>
+                  <p className="text-2xl font-bold text-red-500 tracking-tight">
                     −{formatCurrency(summary.expensesCents)}
-                  </dd>
+                  </p>
                 </div>
-                <div className="flex justify-between border-t border-gray-200 pt-2 mt-2">
-                  <dt className="text-gray-800 font-medium">After expenses (saved)</dt>
-                  <dd className="font-medium text-gray-900">
+                <div className="bg-zinc-900 border border-border p-6 rounded-3xl group hover:border-primary/30 transition-all">
+                  <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2 block">
+                    Net Savings
+                  </span>
+                  <p className="text-2xl font-bold text-white tracking-tight">
                     {formatCurrency(summary.incomeCents - summary.expensesCents)}
-                  </dd>
+                  </p>
                 </div>
-                <div className="flex justify-between">
-                  <dt className="text-gray-600">Invested this month</dt>
-                  <dd className="font-medium text-blue-700">
-                    {formatCurrency(summary.investedCents)}
-                  </dd>
-                </div>
-              </dl>
+              </>
             ) : (
-              <p className="text-sm text-gray-500">No summary for this month.</p>
+              <div className="col-span-3 p-6 bg-zinc-900 border border-dashed border-border rounded-3xl text-center">
+                <p className="text-sm text-zinc-500 font-medium italic">
+                  No summary for this month.
+                </p>
+              </div>
             )}
           </div>
         )}
 
-        {month && (
-          <div className="mb-6">
-            <CategoryPieChart title={`Expenses by category (${month})`} data={categoryBreakdown} />
+        {month && categoryBreakdown.length > 0 && (
+          <div className="mb-12 bg-zinc-900 border border-border p-8 rounded-4xl">
+            <CategoryPieChart title={`Expense Breakdown (${month})`} data={categoryBreakdown} />
           </div>
         )}
 
-        {loading && <p className="text-sm text-gray-600">Loading transactions…</p>}
-        {!loading && (
-          <div className="overflow-hidden rounded-md border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Date</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Name</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Category</th>
-                  <th className="px-4 py-2 text-right font-medium text-gray-700">Amount</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {transactions.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
-                      No transactions for this month. Link a bank or credit card in Manage
-                      connections; transactions sync automatically each night.
+        <div className="bg-zinc-900 border border-border rounded-3xl overflow-hidden shadow-xl">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="bg-zinc-800/50 border-b border-border">
+                <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                  Date
+                </th>
+                <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                  Transaction
+                </th>
+                <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                  Category
+                </th>
+                <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                  Amount
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {loading && transactions.length === 0 ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i}>
+                    <td colSpan={4} className="px-6 py-4">
+                      <div className="h-4 bg-zinc-800 animate-pulse rounded w-full" />
                     </td>
                   </tr>
-                ) : (
-                  transactions.map((tx) => (
-                    <tr key={tx.id}>
-                      <td className="px-4 py-2 text-gray-700">{tx.date}</td>
-                      <td className="px-4 py-2">
-                        <div className="font-medium text-gray-900">{tx.name}</div>
-                        {tx.merchantName && (
-                          <div className="text-xs text-gray-500">{tx.merchantName}</div>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-gray-700">
-                        {tx.categoryName ?? '—'}
-                        {tx.pending && (
-                          <span className="ml-1 text-xs text-amber-600">(pending)</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2 text-right font-medium">
-                        <span className={tx.amountCents > 0 ? 'text-green-700' : 'text-red-700'}>
-                          {formatCurrency(tx.amountCents)}
+                ))
+              ) : transactions.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-12 text-center">
+                    <p className="text-zinc-500 font-medium italic">
+                      No transactions found for this period.
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                transactions.map((tx) => (
+                  <tr
+                    key={tx.id}
+                    className="hover:bg-zinc-800/30 transition-colors cursor-default group"
+                  >
+                    <td className="px-6 py-4 text-zinc-400 font-medium">{tx.date}</td>
+                    <td className="px-6 py-4">
+                      <div className="font-bold text-white group-hover:text-primary transition-colors">
+                        {tx.name}
+                      </div>
+                      {tx.merchantName && (
+                        <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter mt-0.5">
+                          {tx.merchantName}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="bg-zinc-800 text-zinc-300 px-3 py-1 rounded-full text-[10px] font-bold border border-border">
+                        {tx.categoryName ?? 'UNCATEGORIZED'}
+                      </span>
+                      {tx.pending && (
+                        <span className="ml-2 text-[10px] font-bold text-orange-400 uppercase">
+                          Pending
                         </span>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-right font-bold">
+                      <span className={tx.amountCents > 0 ? 'text-green-500' : 'text-red-500'}>
+                        {formatCurrency(tx.amountCents)}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Yearly expense summary by category */}
-      <div className="mt-8 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Yearly expense summary</h2>
-        <p className="text-sm text-gray-600 mb-4">
-          Total spent per category for a full year (from retained yearly summaries). Data appears
-          after retention has run for that year.
-        </p>
-        <div className="flex items-end gap-4 mb-4">
+      <div className="bg-card border border-border rounded-4xl p-8 shadow-2xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <h2 className="text-xl font-bold text-white mb-1">Yearly Summary</h2>
+            <p className="text-zinc-500 text-sm font-medium">
+              Total spent per category for the year.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-bold text-zinc-500 uppercase tracking-widest">
+              Year
+            </label>
             <select
               value={yearlySummaryYear}
               onChange={(e) => setYearlySummaryYear(e.target.value)}
-              className="block w-32 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+              className="bg-zinc-900 border border-border text-zinc-100 rounded-full px-4 py-2 text-xs font-bold focus:border-primary focus:outline-none transition-all cursor-pointer"
             >
-              <option value="">Select…</option>
+              <option value="">Select Year</option>
               {Array.from(
                 { length: Math.max(0, new Date().getFullYear() - START_YEAR + 1) },
                 (_, i) => new Date().getFullYear() - i,
@@ -437,43 +481,62 @@ export function ExpenseTracker() {
             </select>
           </div>
         </div>
-        {yearlySummaryError && <p className="text-sm text-red-600 mb-4">{yearlySummaryError}</p>}
+
+        {yearlySummaryError && (
+          <p className="text-sm text-red-400 mb-6 font-medium">{yearlySummaryError}</p>
+        )}
         {!yearlySummaryYear ? (
-          <p className="text-sm text-gray-500">Select a year to view yearly totals.</p>
+          <div className="p-12 text-center border border-dashed border-border rounded-3xl">
+            <p className="text-zinc-600 font-medium">Select a year to view yearly totals.</p>
+          </div>
         ) : yearlySummaryLoading ? (
-          <p className="text-sm text-gray-500">Loading…</p>
+          <div className="space-y-4">
+            <div className="h-12 bg-zinc-800 animate-pulse rounded-2xl" />
+            <div className="h-12 bg-zinc-800 animate-pulse rounded-2xl" />
+          </div>
         ) : yearlySummary && yearlySummary.byCategory.length > 0 ? (
-          <div className="overflow-hidden rounded-md border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200 text-sm">
-              <thead className="bg-gray-50">
+          <div className="bg-zinc-900 border border-border rounded-3xl overflow-hidden shadow-xl">
+            <table className="min-w-full text-sm">
+              <thead className="bg-zinc-800/50 border-b border-border">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Category</th>
-                  <th className="px-4 py-2 text-right font-medium text-gray-700">Spent</th>
-                  <th className="px-4 py-2 text-right font-medium text-gray-700">Transactions</th>
+                  <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                    Category
+                  </th>
+                  <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                    Amount
+                  </th>
+                  <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                    Count
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
+              <tbody className="divide-y divide-border">
                 {yearlySummary.byCategory.map((row) => (
-                  <tr key={row.categoryId}>
-                    <td className="px-4 py-2 font-medium text-gray-900">{row.categoryName}</td>
-                    <td className="px-4 py-2 text-right text-red-700">
+                  <tr key={row.categoryId} className="hover:bg-zinc-800/30 transition-colors">
+                    <td className="px-6 py-4 font-bold text-white">{row.categoryName}</td>
+                    <td className="px-6 py-4 text-right text-red-500 font-bold">
                       {formatCurrency(row.totalCents)}
                     </td>
-                    <td className="px-4 py-2 text-right text-gray-600">{row.transactionCount}</td>
+                    <td className="px-6 py-4 text-right text-zinc-400 font-medium">
+                      {row.transactionCount} txns
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 text-sm font-medium text-gray-900">
-              Total:{' '}
-              {formatCurrency(yearlySummary.byCategory.reduce((s, r) => s + r.totalCents, 0))}
+            <div className="px-6 py-6 bg-card border-t border-border flex justify-between items-center">
+              <span className="text-sm font-bold text-white uppercase tracking-widest">
+                Annual Total
+              </span>
+              <span className="text-2xl font-bold text-red-500">
+                {formatCurrency(yearlySummary.byCategory.reduce((s, r) => s + r.totalCents, 0))}
+              </span>
             </div>
           </div>
         ) : yearlySummary && yearlySummary.byCategory.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No yearly data for {yearlySummaryYear}. Summaries are created when retention runs (e.g.
-            after year-end).
-          </p>
+          <div className="p-12 text-center border border-dashed border-border rounded-3xl">
+            <p className="text-zinc-600 font-medium">No yearly data for {yearlySummaryYear}.</p>
+          </div>
         ) : null}
       </div>
     </div>

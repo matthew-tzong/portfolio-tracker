@@ -66,11 +66,22 @@ export function PlaidLinkButton({ onLinked }: PlaidLinkButtonProps) {
         type="button"
         onClick={handleClick}
         disabled={loading}
-        className="py-2.5 px-4 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        className="bg-blue-600 text-white px-8 py-3 rounded-full text-sm font-bold hover:bg-blue-500 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        {loading ? 'Adding Plaid Item...' : 'Add Plaid Item'}
+        {loading ? (
+          <div className="flex items-center gap-2">
+            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <span>Connecting...</span>
+          </div>
+        ) : (
+          'Connect Bank via Plaid'
+        )}
       </button>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-4 text-xs text-red-400 font-medium bg-red-500/10 border border-red-500/20 p-3 rounded-xl">
+          {error}
+        </p>
+      )}
     </div>
   )
 }

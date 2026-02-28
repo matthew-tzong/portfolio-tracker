@@ -33,28 +33,34 @@ function formatCurrency(value: number): string {
 }
 
 // Returns the budget bar chart.
-export function BudgetBarChart({ title, data, height = 280 }: BudgetBarChartProps) {
+export function BudgetBarChart({ title, data, height = 320 }: BudgetBarChartProps) {
   if (!data.length) {
-    return <p className="text-sm text-gray-500">No budget data available.</p>
+    return <p className="text-sm text-zinc-500 font-medium italic">No budget data available.</p>
   }
 
   // Filters out zero data points.
   const nonZeroData = data.filter((dataPoint) => dataPoint.budget > 0 || dataPoint.spent > 0)
   if (!nonZeroData.length) {
-    return <p className="text-sm text-gray-500">All categories have zero budget and spend.</p>
+    return (
+      <p className="text-sm text-zinc-500 font-medium italic">
+        All categories have zero budget and spend.
+      </p>
+    )
   }
 
   return (
     <div className="w-full">
-      <h3 className="text-md font-medium text-gray-800 mb-2">{title}</h3>
-      <div style={{ width: '100%', height }}>
-        <ResponsiveContainer>
+      <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6">
+        {title}
+      </h3>
+      <div style={{ width: '100%', minWidth: 0, minHeight: height }}>
+        <ResponsiveContainer width="100%" height={height}>
           <BarChart
             data={nonZeroData}
             margin={{ top: 10, right: 20, bottom: 40, left: 0 }}
             barCategoryGap={16}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#27272a" />
             <XAxis
               dataKey="name"
               angle={-35}
@@ -62,25 +68,52 @@ export function BudgetBarChart({ title, data, height = 280 }: BudgetBarChartProp
               height={50}
               interval={0}
               tickLine={false}
-              axisLine={{ stroke: '#E5E7EB' }}
-              tick={{ fontSize: 11, fill: '#6B7280' }}
+              axisLine={false}
+              tick={{ fontSize: 10, fill: '#71717a', fontWeight: 600 }}
             />
             <YAxis
               tickFormatter={formatCurrency}
               tickLine={false}
-              axisLine={{ stroke: '#E5E7EB' }}
-              tick={{ fontSize: 11, fill: '#6B7280' }}
+              axisLine={false}
+              tick={{ fontSize: 10, fill: '#71717a', fontWeight: 600 }}
             />
             <Tooltip
+              cursor={{ fill: 'rgba(255,255,255,0.05)', radius: 8 }}
+              contentStyle={{
+                backgroundColor: '#18181b',
+                border: '1px solid #27272a',
+                borderRadius: '16px',
+                padding: '12px',
+                boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)',
+              }}
+              itemStyle={{ fontSize: '12px', fontWeight: 600 }}
+              labelStyle={{ color: '#fff', marginBottom: '4px', fontWeight: 700 }}
               formatter={(value: unknown, name: unknown) =>
                 typeof value === 'number'
                   ? [formatCurrency(value), name === 'budget' ? 'Budget' : 'Spent']
                   : [String(value), String(name)]
               }
             />
-            <Legend />
-            <Bar dataKey="budget" name="Budget" fill="#93C5FD" />
-            <Bar dataKey="spent" name="Spent" fill="#FCA5A5" />
+            <Legend
+              verticalAlign="top"
+              align="right"
+              iconType="circle"
+              wrapperStyle={{ paddingBottom: '20px', fontSize: '12px', fontWeight: 700 }}
+            />
+            <Bar
+              dataKey="budget"
+              name="Budget"
+              fill="#22c55e"
+              radius={[4, 4, 0, 0]}
+              animationDuration={1500}
+            />
+            <Bar
+              dataKey="spent"
+              name="Spent"
+              fill="#ef4444"
+              radius={[4, 4, 0, 0]}
+              animationDuration={1500}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>

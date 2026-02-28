@@ -33,10 +33,8 @@ interface NetWorthSnapshot {
   liabilitiesCents: number
 }
 
-// Main signed-in dashboard for the single-user app, shows autheticated user
+// Main signed-in dashboard for the single-user app, shows authenticated user
 export function Dashboard() {
-  const [pingResult, setPingResult] = useState<string>('')
-  const [loading, setLoading] = useState(false)
   const [accountsData, setAccountsData] = useState<AccountsResponse | null>(null)
   const [accountsLoading, setAccountsLoading] = useState(false)
   const [accountsError, setAccountsError] = useState<string | null>(null)
@@ -81,19 +79,6 @@ export function Dashboard() {
     void loadNetWorthSnapshots()
   }, [])
 
-  // Tests the validation of the Supabase JWT.
-  const testProtectedEndpoint = async () => {
-    setLoading(true)
-    try {
-      const result = await apiRequest<{ message: string }>('/api/protected/ping')
-      setPingResult(result.message)
-    } catch (err: unknown) {
-      setPingResult(`Error: ${err instanceof Error ? err.message : 'Request failed'}`)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   // Formats the currency.
   const formatCurrency = (cents: number) =>
     new Intl.NumberFormat('en-US', {
@@ -104,122 +89,86 @@ export function Dashboard() {
 
   // Returns the dashboard page.
   return (
-    <div className="max-w-3xl mx-auto py-8 px-5">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Dashboard</h1>
+    <div className="max-w-4xl mx-auto py-12 px-6">
+      <h1 className="text-3xl font-bold text-white tracking-tight mb-10">Dashboard</h1>
 
-      <div className="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <h2 className="text-lg font-medium text-gray-900 mb-2">Net worth</h2>
-        {accountsLoading && (
-          <p className="text-sm text-gray-600">Loading accounts and balances...</p>
+      {/* Net Worth Summary */}
+      <div className="mb-8 bg-card border border-border rounded-4xl p-10 shadow-2xl relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-8">
+          <div className="bg-primary/10 border border-primary/20 rounded-full px-3 py-1 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            <span className="text-[10px] font-bold text-primary uppercase tracking-tighter">
+              Today's Total
+            </span>
+          </div>
+        </div>
+
+        <h2 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2 ml-1">
+          Total Net Worth
+        </h2>
+        {accountsLoading ? (
+          <div className="h-12 w-48 bg-zinc-800 animate-pulse rounded-lg mb-8" />
+        ) : (
+          <p className="text-5xl font-bold text-white mb-10 tracking-tighter">
+            {accountsData ? formatCurrency(accountsData.netWorthCents) : '$0.00'}
+          </p>
         )}
+
         {accountsError && (
-          <p className="text-sm text-red-600">Failed to load accounts: {accountsError}</p>
+          <p className="text-sm text-red-400 mb-6 bg-red-500/10 border border-red-500/20 p-4 rounded-2xl">
+            Error loading accounts: {accountsError}
+          </p>
         )}
+
         {!accountsLoading && !accountsError && accountsData && (
-          <>
-            <p className="text-3xl font-semibold text-gray-900 mb-3">
-              {formatCurrency(accountsData.netWorthCents)}
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4">
-              <div className="bg-green-50 border border-green-100 rounded-md p-3">
-                <p className="text-xs uppercase tracking-wide text-green-800">Cash</p>
-                <p className="text-base font-medium text-green-900">
-                  {formatCurrency(accountsData.cashCents)}
-                </p>
-              </div>
-              <div className="bg-blue-50 border border-blue-100 rounded-md p-3">
-                <p className="text-xs uppercase tracking-wide text-blue-800">Investments</p>
-                <p className="text-base font-medium text-blue-900">
-                  {formatCurrency(accountsData.investmentsCents)}
-                </p>
-              </div>
-              <div className="bg-red-50 border border-red-100 rounded-md p-3">
-                <p className="text-xs uppercase tracking-wide text-red-800">Liabilities</p>
-                <p className="text-base font-medium text-red-900">
-                  {formatCurrency(-accountsData.liabilitiesCents)}
-                </p>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-zinc-900 border border-border p-6 rounded-3xl group hover:border-green-500/30 transition-all">
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
+                Cash Assets
+              </p>
+              <p className="text-xl font-bold text-white">
+                {formatCurrency(accountsData.cashCents)}
+              </p>
             </div>
-
-            {(accountsData.accounts?.length ?? 0) > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-gray-800 mb-2">Accounts</h3>
-                <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
-                  <table className="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-2 text-left font-medium text-gray-700">Name</th>
-                        <th className="px-4 py-2 text-left font-medium text-gray-700">Type</th>
-                        <th className="px-4 py-2 text-right font-medium text-gray-700">Balance</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {(accountsData.accounts ?? []).map((acct) => (
-                        <tr key={`${acct.provider}-${acct.accountId}`}>
-                          <td className="px-4 py-2">
-                            <div className="font-medium text-gray-900">{acct.name}</div>
-                            <div className="text-xs text-gray-500">
-                              {acct.mask ? `•••• ${acct.mask}` : acct.accountId}
-                            </div>
-                          </td>
-                          <td className="px-4 py-2 text-gray-700">
-                            {acct.subtype ? `${acct.type} · ${acct.subtype}` : acct.type}
-                          </td>
-                          <td className="px-4 py-2 text-right">
-                            <span
-                              className={
-                                acct.isLiability
-                                  ? 'text-red-700 font-medium'
-                                  : 'text-gray-900 font-medium'
-                              }
-                            >
-                              {formatCurrency(acct.balanceCents)}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      <div className="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <h2 className="text-lg font-medium text-gray-900 mb-2">Net worth over time</h2>
-        {netWorthLoading && <p className="text-sm text-gray-600">Loading net worth history...</p>}
-        {netWorthError && (
-          <p className="text-sm text-red-600">Failed to load net worth history: {netWorthError}</p>
-        )}
-        {!netWorthLoading && !netWorthError && (
-          <div className="mt-2">
-            <TimeSeriesChart
-              title="Monthly net worth"
-              data={netWorthSnapshots.map((s) => ({
-                date: s.month,
-                value: s.netWorthCents / 100,
-              }))}
-              height={260}
-            />
+            <div className="bg-zinc-900 border border-border p-6 rounded-3xl group hover:border-blue-500/30 transition-all">
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
+                Investments
+              </p>
+              <p className="text-xl font-bold text-white">
+                {formatCurrency(accountsData.investmentsCents)}
+              </p>
+            </div>
+            <div className="bg-zinc-900 border border-border p-6 rounded-3xl group hover:border-red-500/30 transition-all">
+              <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
+                Liabilities
+              </p>
+              <p className="text-xl font-bold text-red-400">
+                {formatCurrency(-accountsData.liabilitiesCents)}
+              </p>
+            </div>
           </div>
         )}
       </div>
 
-      <div className="mb-6 p-5 bg-gray-100 rounded-lg">
-        <h2 className="text-lg font-medium text-gray-900 mb-1">Protected API Test</h2>
-        <p className="text-sm text-gray-600 mb-3">Test the Go backend JWT validation:</p>
-        <button
-          onClick={testProtectedEndpoint}
-          disabled={loading}
-          className="mt-2 py-2.5 px-4 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Testing...' : 'Test Protected Endpoint'}
-        </button>
-        {pingResult && (
-          <div className="mt-3 p-3 bg-white rounded border border-gray-200 text-sm">
-            <strong>Result:</strong> {pingResult}
+      {/* Net Worth Over Time Chart */}
+      <div className="mb-8 bg-card border border-border rounded-4xl p-10 shadow-2xl">
+        <h2 className="text-xl font-bold text-white mb-8">Net Worth Over Time</h2>
+        {netWorthLoading ? (
+          <div className="h-[300px] bg-zinc-800 animate-pulse rounded-3xl" />
+        ) : netWorthError ? (
+          <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 p-4 rounded-2xl">
+            {netWorthError}
+          </p>
+        ) : (
+          <div className="h-[300px]">
+            <TimeSeriesChart
+              title=""
+              data={netWorthSnapshots.map((s) => ({
+                date: s.month,
+                value: s.netWorthCents / 100,
+              }))}
+              height={300}
+            />
           </div>
         )}
       </div>

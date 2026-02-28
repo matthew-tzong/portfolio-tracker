@@ -4,6 +4,26 @@
 
 @layer base {
   body {
-    @apply bg-gray-100 font-sans antialiased;
+    @apply bg-background text-zinc-100 antialiased;
+  }
+
+  /* Custom Scrollbar for Dark Theme */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-background;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-zinc-800 rounded-full border-2 border-background hover:bg-zinc-700 transition-colors;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-card/80 backdrop-blur-md border border-border;
   }
 }

@@ -140,90 +140,111 @@ export function LinkManagement() {
 
   // Returns the link management page.
   return (
-    <div className="max-w-4xl mx-auto py-8 px-5">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-2">Connections</h1>
-      <p className="text-sm text-gray-600 mb-4">
-        Manage your Plaid bank connections and Snaptrade brokerage connections. This app is
-        single-user: these are your connections only.
-      </p>
+    <div className="max-w-6xl mx-auto py-10 px-6">
+      <div className="mb-10">
+        <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Connections</h1>
+        <p className="text-zinc-500 font-medium max-w-2xl">
+          Manage your Plaid bank connections and Snaptrade brokerage connections.
+        </p>
+      </div>
 
-      {loading && (
-        <div className="mt-4 text-gray-600 text-sm">
-          <p>Loading connections...</p>
-        </div>
-      )}
+      {loading && <div className="h-20 bg-zinc-800 animate-pulse rounded-3xl mb-8" />}
 
       {error && (
-        <div className="mt-4 text-sm text-red-600">
-          <p>{error}</p>
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm font-medium mb-8">
+          {error}
         </div>
       )}
 
-      {/* Add new connections */}
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
-        <div className="p-5 bg-blue-50 rounded-lg border border-blue-100">
-          <h2 className="text-lg font-medium text-gray-900 mb-2">Add Plaid connection</h2>
-          <p className="text-sm text-gray-700 mb-3">
-            Link your bank or credit card accounts via Plaid.
-          </p>
-          <PlaidLinkButton onLinked={load} />
+      {/* Add new connections cards */}
+      <div className="grid gap-8 md:grid-cols-2 mb-12">
+        <div className="p-8 bg-zinc-900 border border-border rounded-4xl group hover:border-blue-500/30 transition-all shadow-xl relative overflow-hidden">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all" />
+          <div className="relative">
+            <h2 className="text-xl font-bold text-white mb-2">Banking & Credit</h2>
+            <p className="text-zinc-500 text-sm font-medium mb-8 leading-relaxed">
+              Connect via Plaid to sync transactions and balances automatically.
+            </p>
+            <PlaidLinkButton onLinked={load} />
+          </div>
         </div>
         <SnaptradeConnectSection onConnected={load} />
       </div>
 
       {!loading && data && (
-        <div className="mt-6 space-y-6">
+        <div className="space-y-10">
           <section>
-            <h2 className="text-lg font-medium text-gray-900 mb-2">Plaid items</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <h2 className="text-xl font-bold text-white">Plaid Connections</h2>
+              <span className="bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-md text-[10px] font-bold border border-border">
+                {data.plaidItems.length} ACTIVE
+              </span>
+            </div>
+
             {data.plaidItems.length === 0 ? (
-              <p className="text-sm text-gray-600">
-                No Plaid connections yet. Add a connection above to get started.
-              </p>
+              <div className="p-12 text-center border border-dashed border-border rounded-4xl">
+                <p className="text-zinc-600 font-medium italic italic">
+                  No active Plaid connections.
+                </p>
+              </div>
             ) : (
-              <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700">Institution</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700">Status</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700">
-                        Last updated
+              <div className="bg-zinc-900 border border-border rounded-4xl overflow-hidden shadow-2xl">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-zinc-800/50 border-b border-border">
+                      <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                        Institution
                       </th>
-                      <th className="px-4 py-2 text-right font-medium text-gray-700">Actions</th>
+                      <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                        Last Updated
+                      </th>
+                      <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-border">
                     {data.plaidItems.map((item) => (
-                      <tr key={item.itemId}>
-                        <td className="px-4 py-2">
-                          <div className="font-medium text-gray-900">
-                            {item.institutionName || 'Plaid item'}
+                      <tr
+                        key={item.itemId}
+                        className="hover:bg-zinc-800/30 transition-colors group"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-white group-hover:text-primary transition-colors">
+                            {item.institutionName || 'Plaid Institution'}
                           </div>
-                          <div className="text-xs text-gray-500 truncate">
-                            Item ID: {item.itemId}
+                          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter mt-0.5">
+                            ID: {item.itemId}
                           </div>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
                           <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
                               item.status === 'OK'
-                                ? 'bg-green-50 text-green-700'
-                                : 'bg-red-50 text-red-700'
+                                ? 'bg-primary/10 text-primary border-primary/20'
+                                : 'bg-red-500/10 text-red-400 border-red-500/20'
                             }`}
                           >
-                            {item.status}
+                            {item.status === 'OK' ? 'CONNECTED' : item.status}
                           </span>
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-600">
-                          {new Date(item.lastUpdated).toLocaleString()}
+                        <td className="px-6 py-4 text-zinc-400 font-medium">
+                          {new Date(item.lastUpdated).toLocaleDateString()} at{' '}
+                          {new Date(item.lastUpdated).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
                         </td>
-                        <td className="px-4 py-2 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-3">
                             {item.status !== 'OK' && (
                               <button
                                 type="button"
                                 onClick={() => reconnectPlaidItem(item.itemId)}
-                                className="inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 shadow-sm hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                className="px-4 py-1.5 bg-blue-500 text-white text-[11px] font-bold rounded-full hover:bg-blue-400 transition-all shadow-lg active:scale-95"
                               >
                                 Reconnect
                               </button>
@@ -231,9 +252,9 @@ export function LinkManagement() {
                             <button
                               type="button"
                               onClick={() => removePlaidItem(item.itemId)}
-                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                              className="px-4 py-1.5 bg-zinc-800 text-zinc-400 text-[11px] font-bold rounded-full border border-border hover:bg-red-500 hover:text-white hover:border-red-500 transition-all active:scale-95"
                             >
-                              Remove
+                              Disconnect
                             </button>
                           </div>
                         </td>
@@ -246,54 +267,82 @@ export function LinkManagement() {
           </section>
 
           <section>
-            <h2 className="text-lg font-medium text-gray-900 mb-2">Snaptrade connections</h2>
+            <div className="flex items-center gap-3 mb-6">
+              <h2 className="text-xl font-bold text-white">Brokerage Connections</h2>
+              <span className="bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-md text-[10px] font-bold border border-border">
+                {data.snaptradeConnections.length} ACTIVE
+              </span>
+            </div>
+
             {data.snaptradeConnections.length === 0 ? (
-              <p className="text-sm text-gray-600">
-                No Snaptrade connections yet. Add a connection above to get started.
-              </p>
+              <div className="p-12 text-center border border-dashed border-border rounded-4xl">
+                <p className="text-zinc-600 font-medium italic italic">
+                  No active brokerage connections.
+                </p>
+              </div>
             ) : (
-              <div className="overflow-hidden rounded-md border border-gray-200 bg-white">
-                <table className="min-w-full divide-y divide-gray-200 text-sm">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700">Brokerage</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700">Status</th>
-                      <th className="px-4 py-2 text-left font-medium text-gray-700">Last synced</th>
-                      <th className="px-4 py-2 text-right font-medium text-gray-700">Actions</th>
+              <div className="bg-zinc-900 border border-border rounded-4xl overflow-hidden shadow-2xl">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-zinc-800/50 border-b border-border">
+                      <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                        Brokerage
+                      </th>
+                      <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                        Last Synced
+                      </th>
+                      <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-border">
                     {data.snaptradeConnections.map((conn) => (
-                      <tr key={conn.id}>
-                        <td className="px-4 py-2">
-                          <div className="font-medium text-gray-900">{conn.brokerage}</div>
-                          <div className="text-xs text-gray-500 truncate">
-                            Connection ID: {conn.id}
+                      <tr key={conn.id} className="hover:bg-zinc-800/30 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-white group-hover:text-primary transition-colors">
+                            {conn.brokerage}
+                          </div>
+                          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter mt-0.5">
+                            ID: {conn.id}
                           </div>
                         </td>
-                        <td className="px-4 py-2">
+                        <td className="px-6 py-4">
                           <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                            className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
                               conn.status === 'OK'
-                                ? 'bg-green-50 text-green-700'
+                                ? 'bg-primary/10 text-primary border-primary/20'
                                 : conn.status === 'ACCOUNT_FETCH_ERROR'
-                                  ? 'bg-yellow-50 text-yellow-700'
-                                  : 'bg-red-50 text-red-700'
+                                  ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+                                  : 'bg-red-500/10 text-red-400 border-red-500/20'
                             }`}
                           >
-                            {conn.status}
+                            {conn.status === 'OK' ? 'SYNCED' : conn.status.replace(/_/g, ' ')}
                           </span>
                         </td>
-                        <td className="px-4 py-2 text-sm text-gray-600">
-                          {conn.lastSynced ? new Date(conn.lastSynced).toLocaleString() : '—'}
+                        <td className="px-6 py-4 text-zinc-400 font-medium">
+                          {conn.lastSynced ? (
+                            <>
+                              {new Date(conn.lastSynced).toLocaleDateString()} at{' '}
+                              {new Date(conn.lastSynced).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </>
+                          ) : (
+                            'PENDING SYNC'
+                          )}
                         </td>
-                        <td className="px-4 py-2 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-3">
                             {conn.status === 'CONNECTION_ERROR' && (
                               <button
                                 type="button"
                                 onClick={() => reconnectSnaptradeConnection()}
-                                className="inline-flex items-center rounded-md border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 shadow-sm hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                                className="px-4 py-1.5 bg-blue-500 text-white text-[11px] font-bold rounded-full hover:bg-blue-400 transition-all shadow-lg active:scale-95"
                               >
                                 Reconnect
                               </button>
@@ -301,9 +350,9 @@ export function LinkManagement() {
                             <button
                               type="button"
                               onClick={() => removeSnaptradeConnection(conn.id)}
-                              className="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                              className="px-4 py-1.5 bg-zinc-800 text-zinc-400 text-[11px] font-bold rounded-full border border-border hover:bg-red-500 hover:text-white hover:border-red-500 transition-all active:scale-95"
                             >
-                              Remove
+                              Disconnect
                             </button>
                           </div>
                         </td>

@@ -30,45 +30,73 @@ export function Auth() {
   }
 
   return (
-    <div className="max-w-md mx-auto mt-12 px-5">
-      <h1 className="text-2xl font-semibold text-gray-900">Sign in to your portfolio</h1>
-      <p className="text-gray-500 text-sm mt-1 mb-5"></p>
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full px-3 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
+    <div className="min-h-[80vh] flex items-center justify-center px-6">
+      <div className="w-full max-w-md bg-card border border-border rounded-4xl p-10 shadow-2xl relative overflow-hidden group">
+        <div className="mb-10 pt-4">
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Welcome Back</h1>
+          <p className="text-zinc-500 text-sm font-medium">
+            Sign in to your private portfolio tracker.
+          </p>
         </div>
-        <div className="mb-4">
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full px-3 py-2 text-base border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
-        </div>
-        {error && <div className="text-red-600 text-sm mb-4">{error}</div>}
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-2.5 px-4 text-base font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? 'Loading...' : 'Sign in'}
-        </button>
-      </form>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1"
+            >
+              Email Address
+            </label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="name@example.com"
+              className="w-full bg-zinc-900 border border-border text-zinc-100 rounded-2xl px-5 py-3.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all placeholder:text-zinc-700"
+            />
+          </div>
+          <div>
+            <label
+              htmlFor="password"
+              className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1"
+            >
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+              className="w-full bg-zinc-900 border border-border text-zinc-100 rounded-2xl px-5 py-3.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all placeholder:text-zinc-700"
+            />
+          </div>
+
+          {error && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm font-medium animate-shake">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-4 px-6 bg-primary text-background text-sm font-bold rounded-2xl hover:bg-green-400 transition-all shadow-xl active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+          >
+            {loading ? (
+              <div className="flex items-center justify-center gap-2">
+                <span className="w-4 h-4 border-2 border-background/30 border-t-background rounded-full animate-spin" />
+                <span>Authenticating...</span>
+              </div>
+            ) : (
+              'Sign In to Dashboard'
+            )}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }

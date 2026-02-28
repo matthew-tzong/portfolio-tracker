@@ -30,7 +30,7 @@ describe('apiRequest', () => {
   // Test that the function throws when there is no active session.
   it('throws when there is no active session', async () => {
     const { supabase } = await import('./supabase')
-      ; (supabase.auth.getSession as Mock).mockResolvedValue({ data: { session: null } })
+    ;(supabase.auth.getSession as Mock).mockResolvedValue({ data: { session: null } })
     await expect(apiRequest('/api/test')).rejects.toThrow('Not authenticated')
     expect(fetchMock).not.toHaveBeenCalled()
   })
@@ -38,9 +38,9 @@ describe('apiRequest', () => {
   // Test that the function attaches the bearer token and returns parsed JSON.
   it('attaches bearer token and returns parsed JSON', async () => {
     const { supabase } = await import('./supabase')
-      ; (supabase.auth.getSession as Mock).mockResolvedValue({
-        data: { session: { access_token: 'test-token' } },
-      })
+    ;(supabase.auth.getSession as Mock).mockResolvedValue({
+      data: { session: { access_token: 'test-token' } },
+    })
     fetchMock.mockResolvedValue({
       ok: true,
       text: () => Promise.resolve(JSON.stringify({ ok: true })),
@@ -59,9 +59,9 @@ describe('apiRequest', () => {
   // Test that the function throws a helpful error when the response is not ok.
   it('throws a helpful error when response is not ok', async () => {
     const { supabase } = await import('./supabase')
-      ; (supabase.auth.getSession as Mock).mockResolvedValue({
-        data: { session: { access_token: 'test-token' } },
-      })
+    ;(supabase.auth.getSession as Mock).mockResolvedValue({
+      data: { session: { access_token: 'test-token' } },
+    })
     fetchMock.mockResolvedValue({
       ok: false,
       text: () => Promise.resolve('Something went wrong'),

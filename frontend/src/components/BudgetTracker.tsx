@@ -21,7 +21,7 @@ interface CategoriesResponse {
   categories: Category[]
 }
 
-const START_MONTH = '2026-02'
+const START_MONTH = '2026-03'
 const START_YEAR = 2026
 
 // Returns the current month in YYYY-MM.
@@ -213,17 +213,29 @@ export function BudgetTracker() {
 
   // Returns the budget tracker page.
   return (
-    <div className="max-w-4xl mx-auto py-8 px-5">
-      <h1 className="text-2xl font-semibold text-gray-900 mb-6">Budget tracker</h1>
+    <div className="max-w-6xl mx-auto py-10 px-6">
+      <div className="flex justify-between items-center mb-10">
+        <h1 className="text-3xl font-bold text-white tracking-tight">Budget Tracker</h1>
+        <button
+          type="button"
+          onClick={handleSaveBudget}
+          disabled={saving}
+          className="bg-primary text-background px-8 py-3 rounded-full text-sm font-bold hover:bg-green-400 transition-all shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {saving ? 'Saving...' : 'Save Budget'}
+        </button>
+      </div>
 
-      <div className="mb-6 p-5 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex flex-wrap items-end gap-4 mb-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Month</label>
+      <div className="bg-card border border-border rounded-4xl p-8 shadow-2xl mb-8">
+        <div className="flex flex-wrap items-end gap-8 mb-10">
+          <div className="flex-1 min-w-[240px]">
+            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1">
+              Analysis Month
+            </label>
             <select
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="block w-40 rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
+              className="w-full bg-zinc-900 border border-border text-zinc-100 rounded-2xl px-5 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all cursor-pointer"
             >
               {monthOptions.map((m) => (
                 <option key={m} value={m}>
@@ -231,79 +243,84 @@ export function BudgetTracker() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-2 text-[10px] text-zinc-500 font-medium ml-1">
               Budget numbers are global; the month only changes the spent column.
             </p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Total monthly budget
+          <div className="flex-1 min-w-[240px]">
+            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1">
+              Total Monthly Allocation
             </label>
-            <input
-              type="number"
-              min={0}
-              step="0.01"
-              value={totalBudget}
-              onChange={(e) => setTotalBudget(e.target.value)}
-              placeholder="0.00"
-              className="block w-40 rounded-md border border-gray-300 px-3 py-2 text-sm text-right focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
-            />
-            <p className="mt-1 text-xs text-gray-500">
+            <div className="relative">
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-zinc-500 font-bold">
+                $
+              </span>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={totalBudget}
+                onChange={(e) => setTotalBudget(e.target.value)}
+                placeholder="0.00"
+                className="w-full bg-zinc-900 border border-border text-zinc-100 rounded-2xl pl-9 pr-5 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
+              />
+            </div>
+            <p className="mt-2 text-[10px] text-zinc-500 font-medium ml-1">
               Per-category budgets must add up exactly to this total.
             </p>
           </div>
         </div>
 
-        {!loading && (
-          <div className="mb-3 text-xs text-gray-600">
-            <span className="mr-3">
-              Total allocated:{' '}
-              {formatCurrency(
-                Object.values(allocations).reduce(
-                  (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                  0,
-                ),
-              )}
-            </span>
-            {totalBudget && (
-              <span>
-                Target: {formatCurrency(Math.round((parseFloat(totalBudget || '0') || 0) * 100))}
-              </span>
-            )}
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-sm font-medium">
+            {error}
+          </div>
+        )}
+        {successMessage && (
+          <div className="mb-6 p-4 bg-primary/10 border border-primary/20 rounded-2xl text-primary text-sm font-medium">
+            {successMessage}
           </div>
         )}
 
-        {error && <p className="text-sm text-red-600 mb-3">{error}</p>}
-        {successMessage && <p className="text-sm text-green-700 mb-3">{successMessage}</p>}
-
         {loading ? (
-          <p className="text-sm text-gray-600">Loading budget…</p>
+          <div className="space-y-4">
+            <div className="h-[300px] bg-zinc-800 animate-pulse rounded-3xl" />
+            <div className="h-48 bg-zinc-800 animate-pulse rounded-3xl" />
+          </div>
         ) : (
           <>
-            <div className="mb-6">
+            <div className="mb-12 bg-zinc-900 border border-border p-8 rounded-4xl">
               <BudgetBarChart
-                title={`Budget vs spent by category (${month})`}
+                title={`Monthly Budget Utilization (${month})`}
                 data={budgetChartData}
               />
             </div>
-            <div className="overflow-hidden rounded-md border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200 text-sm">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left font-medium text-gray-700">Category</th>
-                    <th className="px-4 py-2 text-right font-medium text-gray-700">
-                      Budget (per month)
+
+            <div className="bg-zinc-900 border border-border rounded-3xl overflow-hidden shadow-xl mb-8">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="bg-zinc-800/50 border-b border-border">
+                    <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                      Category
                     </th>
-                    <th className="px-4 py-2 text-right font-medium text-gray-700">
-                      Spent ({month})
+                    <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                      Allocated
                     </th>
-                    <th className="px-4 py-2 text-right font-medium text-gray-700">Remaining</th>
+                    <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                      Spent
+                    </th>
+                    <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                      Remaining
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
+                <tbody className="divide-y divide-border">
                   {categories.filter((c) => c.expense).length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-6 text-center text-gray-500">
+                      <td
+                        colSpan={4}
+                        className="px-6 py-12 text-center text-zinc-500 font-medium italic"
+                      >
                         No expense categories available.
                       </td>
                     </tr>
@@ -318,40 +335,50 @@ export function BudgetTracker() {
                         const overBudget = allocatedCents > 0 && spentCents > allocatedCents
 
                         return (
-                          <tr key={category.id}>
-                            <td className="px-4 py-2 text-gray-800">{category.name}</td>
-                            <td className="px-4 py-2 text-right">
-                              <input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={allocatedCents > 0 ? (allocatedCents / 100).toString() : ''}
-                                onChange={(e) =>
-                                  handleAllocationChange(category.id, e.target.value)
-                                }
-                                className="w-28 rounded-md border border-gray-300 px-2 py-1 text-right text-sm focus:border-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-500"
-                                placeholder="0.00"
-                              />
+                          <tr
+                            key={category.id}
+                            className="hover:bg-zinc-800/30 transition-colors group"
+                          >
+                            <td className="px-6 py-4 font-bold text-white">{category.name}</td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex justify-end items-center">
+                                <span className="text-zinc-500 mr-2 text-xs font-bold">$</span>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={
+                                    allocatedCents > 0 ? (allocatedCents / 100).toString() : ''
+                                  }
+                                  onChange={(e) =>
+                                    handleAllocationChange(category.id, e.target.value)
+                                  }
+                                  className="w-24 bg-zinc-800 border border-border text-zinc-100 rounded-lg px-2 py-1 text-right text-xs focus:border-primary focus:outline-none transition-all"
+                                  placeholder="0.00"
+                                />
+                              </div>
                             </td>
-                            <td className="px-4 py-2 text-right">
+                            <td className="px-6 py-4 text-right">
                               {spentCents === 0 ? (
-                                <span className="text-gray-400">—</span>
+                                <span className="text-zinc-600 font-bold">—</span>
                               ) : (
-                                <span className={overBudget ? 'text-red-700' : 'text-gray-900'}>
+                                <span
+                                  className={`font-bold ${overBudget ? 'text-red-500' : 'text-zinc-100'}`}
+                                >
                                   {formatCurrency(spentCents)}
                                 </span>
                               )}
                             </td>
-                            <td className="px-4 py-2 text-right">
+                            <td className="px-6 py-4 text-right">
                               {allocatedCents === 0 ? (
-                                <span className="text-gray-400">No budget</span>
+                                <span className="text-zinc-600 text-[10px] font-bold uppercase tracking-tighter">
+                                  No budget
+                                </span>
                               ) : (
                                 <span
-                                  className={
-                                    remainingCents < 0
-                                      ? 'text-red-700 font-medium'
-                                      : 'text-green-700'
-                                  }
+                                  className={`font-bold ${
+                                    remainingCents < 0 ? 'text-red-500' : 'text-primary'
+                                  }`}
                                 >
                                   {formatCurrency(remainingCents)}
                                 </span>
@@ -365,57 +392,56 @@ export function BudgetTracker() {
               </table>
             </div>
 
-            {/* Overall totals across all categories for this month */}
-            <div className="mt-4 flex justify-between text-sm text-gray-800">
-              <div>
-                <p className="font-medium">
-                  Total budgeted:{' '}
-                  {formatCurrency(
-                    Object.values(allocations).reduce(
-                      (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                      0,
-                    ),
-                  )}
-                </p>
-                <p>
-                  Total spent in {month}:{' '}
-                  {formatCurrency(
-                    Object.values(spent).reduce(
-                      (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                      0,
-                    ),
-                  )}
-                </p>
+            {/* Overall totals summary cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-zinc-900 border border-border p-6 rounded-3xl">
+                <div className="flex justify-between items-center mb-3">
+                  <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest">
+                    Total Planned
+                  </span>
+                  <span className="text-white font-bold">
+                    {formatCurrency(
+                      Object.values(allocations).reduce(
+                        (sum, value) => sum + (typeof value === 'number' ? value : 0),
+                        0,
+                      ),
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest">
+                    Spent in {month}
+                  </span>
+                  <span className="text-zinc-100 font-bold">
+                    {formatCurrency(
+                      Object.values(spent).reduce(
+                        (sum, value) => sum + (typeof value === 'number' ? value : 0),
+                        0,
+                      ),
+                    )}
+                  </span>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="font-semibold">
-                  Total remaining:{' '}
+              <div className="bg-zinc-900 border border-border p-6 rounded-3xl flex flex-col justify-center">
+                <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-1 block text-right">
+                  Total Remaining
+                </span>
+                <p className="text-3xl font-bold text-primary text-right tracking-tight">
                   {formatCurrency(
                     Object.values(allocations).reduce(
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
                     ) -
-                    Object.values(spent).reduce(
-                      (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                      0,
-                    ),
+                      Object.values(spent).reduce(
+                        (sum, value) => sum + (typeof value === 'number' ? value : 0),
+                        0,
+                      ),
                   )}
                 </p>
               </div>
             </div>
           </>
         )}
-
-        <div className="mt-4 flex justify-end">
-          <button
-            type="button"
-            onClick={handleSaveBudget}
-            disabled={saving}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? 'Saving…' : 'Save budget'}
-          </button>
-        </div>
       </div>
     </div>
   )
