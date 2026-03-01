@@ -54,7 +54,7 @@ interface YearlyPortfolioSummaryResponse {
   byAccount: YearlyPortfolioAccount[]
 }
 
-const START_MONTH = '2026-02'
+const START_MONTH = '2026-03'
 const START_YEAR = 2026
 
 // Selected item for the portfolio.
@@ -349,8 +349,10 @@ export function Portfolio() {
   const generateMonthOptions = () => {
     const monthOptions: string[] = []
     const now = new Date()
-    const startMonthDate = new Date(Date.UTC(START_YEAR, 1, 1))
-    const cursor = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
+    const floor = new Date(Date.UTC(START_YEAR, 2, 1))
+    const retentionFloor = new Date(Date.UTC(now.getFullYear() - 1, 0, 1))
+    const startMonthDate = new Date(Math.max(floor.getTime(), retentionFloor.getTime()))
+    const cursor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     while (cursor >= startMonthDate) {
       const y = cursor.getUTCFullYear()
       const m = String(cursor.getUTCMonth() + 1).padStart(2, '0')
@@ -441,11 +443,10 @@ export function Portfolio() {
                 <button
                   type="button"
                   onClick={() => setSelected(selected?.type === 'total' ? null : { type: 'total' })}
-                  className={`w-full text-left p-6 rounded-3xl transition-all duration-300 group ${
-                    selected?.type === 'total'
+                  className={`w-full text-left p-6 rounded-3xl transition-all duration-300 group ${selected?.type === 'total'
                       ? 'bg-zinc-800 border border-zinc-700'
                       : 'hover:bg-zinc-800/50 border border-transparent'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -478,17 +479,16 @@ export function Portfolio() {
                             selected?.type === 'account' && selected.accountId === accountId
                               ? null
                               : {
-                                  type: 'account',
-                                  accountId,
-                                  accountName: accountData.accountName,
-                                },
+                                type: 'account',
+                                accountId,
+                                accountName: accountData.accountName,
+                              },
                           )
                         }
-                        className={`w-full text-left p-5 rounded-3xl border transition-all duration-300 ${
-                          selected?.type === 'account' && selected.accountId === accountId
+                        className={`w-full text-left p-5 rounded-3xl border transition-all duration-300 ${selected?.type === 'account' && selected.accountId === accountId
                             ? 'bg-zinc-800 border-zinc-700'
                             : 'bg-zinc-900 border-border hover:border-zinc-700 hover:bg-zinc-800/40'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-bold text-white truncate mr-2">
@@ -513,20 +513,19 @@ export function Portfolio() {
                                   selected.symbol === h.symbol
                                   ? null
                                   : {
-                                      type: 'holding',
-                                      accountId: h.accountId,
-                                      accountName: h.accountName,
-                                      symbol: h.symbol,
-                                    },
+                                    type: 'holding',
+                                    accountId: h.accountId,
+                                    accountName: h.accountName,
+                                    symbol: h.symbol,
+                                  },
                               )
                             }
-                            className={`w-full text-left px-5 py-3 rounded-2xl flex items-center justify-between text-xs font-medium transition-all ${
-                              selected?.type === 'holding' &&
-                              selected.accountId === h.accountId &&
-                              selected.symbol === h.symbol
+                            className={`w-full text-left px-5 py-3 rounded-2xl flex items-center justify-between text-xs font-medium transition-all ${selected?.type === 'holding' &&
+                                selected.accountId === h.accountId &&
+                                selected.symbol === h.symbol
                                 ? 'bg-primary/10 text-primary border border-primary/20'
                                 : 'hover:bg-zinc-800 text-zinc-400 border border-transparent'
-                            }`}
+                              }`}
                           >
                             <span className="font-bold">{h.symbol}</span>
                             <span>{formatCurrency(h.valueCents)}</span>

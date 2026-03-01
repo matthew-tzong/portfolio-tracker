@@ -39,10 +39,11 @@ func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencie
 	// Gets the cron secret.
 	cronSecret := os.Getenv("CRON_SECRET")
 
-	// Checks the cron secret.
-	headerSecret := r.Header.Get("X-Cron-Secret")
-	if headerSecret != cronSecret {
-		writeJSONError(w, http.StatusUnauthorized, "invalid cron secret")
+	// Checks the Authorization header (Bearer token).
+	authHeader := r.Header.Get("Authorization")
+	expectedAuth := "Bearer " + cronSecret
+	if authHeader != expectedAuth {
+		writeJSONError(w, http.StatusUnauthorized, "invalid authorization")
 		return
 	}
 

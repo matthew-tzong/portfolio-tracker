@@ -117,8 +117,10 @@ export function BudgetTracker() {
   // Builds month options starting from Feb 2026 through today.
   const monthOptions: string[] = []
   const now = new Date()
-  const startMonthDate = new Date(Date.UTC(START_YEAR, 1, 1))
-  const cursor = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1))
+  const floor = new Date(Date.UTC(START_YEAR, 2, 1))
+  const twelveMonthsAgo = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 11, 1))
+  const startMonthDate = new Date(Math.max(floor.getTime(), twelveMonthsAgo.getTime()))
+  const cursor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
   while (cursor >= startMonthDate) {
     const y = cursor.getUTCFullYear()
     const m = String(cursor.getUTCMonth() + 1).padStart(2, '0')
@@ -376,9 +378,8 @@ export function BudgetTracker() {
                                 </span>
                               ) : (
                                 <span
-                                  className={`font-bold ${
-                                    remainingCents < 0 ? 'text-red-500' : 'text-primary'
-                                  }`}
+                                  className={`font-bold ${remainingCents < 0 ? 'text-red-500' : 'text-primary'
+                                    }`}
                                 >
                                   {formatCurrency(remainingCents)}
                                 </span>
@@ -432,10 +433,10 @@ export function BudgetTracker() {
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
                     ) -
-                      Object.values(spent).reduce(
-                        (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                        0,
-                      ),
+                    Object.values(spent).reduce(
+                      (sum, value) => sum + (typeof value === 'number' ? value : 0),
+                      0,
+                    ),
                   )}
                 </p>
               </div>
