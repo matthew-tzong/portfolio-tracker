@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { apiRequest } from '../lib/api'
-import { openSnaptradeConnect, syncSnaptradeConnections } from '../lib/snaptrade'
+// import { openSnaptradeConnect, syncSnaptradeConnections } from '../lib/snaptrade'
 import { PlaidLinkButton } from './PlaidLinkButton'
-import { SnaptradeConnectSection } from './SnaptradeConnectSection'
+// import { SnaptradeConnectSection } from './SnaptradeConnectSection'
 
 // Types for the Plaid item.
 interface PlaidItem {
@@ -12,18 +12,20 @@ interface PlaidItem {
   lastUpdated: string
 }
 
-// Type for the Snaptrade connection.
+/*
+// Type for the Snaptrade connection (deprecated).
 interface SnaptradeConnection {
   id: string
   brokerage: string
   status: string
   lastSynced?: string
 }
+*/
 
 // Type for the links response.
 interface LinksResponse {
   plaidItems: PlaidItem[]
-  snaptradeConnections: SnaptradeConnection[]
+  // snaptradeConnections?: SnaptradeConnection[]
 }
 
 // Returns the link management page.
@@ -46,6 +48,7 @@ export function LinkManagement() {
     }
   }
 
+  /*
   // Reconnects a Snaptrade connection by opening Connect portal.
   const reconnectSnaptradeConnection = async () => {
     setError(null)
@@ -55,7 +58,7 @@ export function LinkManagement() {
       setError(err instanceof Error ? err.message : 'Failed to open Snaptrade Connect')
     }
   }
-
+*/
   useEffect(() => {
     void load()
   }, [])
@@ -123,6 +126,7 @@ export function LinkManagement() {
     }
   }
 
+  /*
   // Removes a Snaptrade connection.
   const removeSnaptradeConnection = async (connectionId: string) => {
     setError(null)
@@ -137,14 +141,14 @@ export function LinkManagement() {
       setError(err instanceof Error ? err.message : 'Failed to remove Snaptrade connection')
     }
   }
-
+*/
   // Returns the link management page.
   return (
     <div className="max-w-6xl mx-auto py-10 px-6">
       <div className="mb-10">
         <h1 className="text-3xl font-bold text-white tracking-tight mb-2">Connections</h1>
         <p className="text-zinc-500 font-medium max-w-2xl">
-          Manage your Plaid bank connections and Snaptrade brokerage connections.
+          Manage your bank and investment connections via Plaid.
         </p>
       </div>
 
@@ -161,14 +165,13 @@ export function LinkManagement() {
         <div className="p-8 bg-zinc-900 border border-border rounded-4xl group hover:border-blue-500/30 transition-all shadow-xl relative overflow-hidden">
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all" />
           <div className="relative">
-            <h2 className="text-xl font-bold text-white mb-2">Banking & Credit</h2>
+            <h2 className="text-xl font-bold text-white mb-2">Plaid Connections</h2>
             <p className="text-zinc-500 text-sm font-medium mb-8 leading-relaxed">
-              Connect via Plaid to sync transactions and balances automatically.
+              Connect your bank and brokerage accounts via Plaid to sync balances and holdings.
             </p>
             <PlaidLinkButton onLinked={load} />
           </div>
         </div>
-        <SnaptradeConnectSection onConnected={load} />
       </div>
 
       {!loading && data && (
@@ -252,104 +255,6 @@ export function LinkManagement() {
                             <button
                               type="button"
                               onClick={() => removePlaidItem(item.itemId)}
-                              className="px-4 py-1.5 bg-zinc-800 text-zinc-400 text-[11px] font-bold rounded-full border border-border hover:bg-red-500 hover:text-white hover:border-red-500 transition-all active:scale-95"
-                            >
-                              Disconnect
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-          <section>
-            <div className="flex items-center gap-3 mb-6">
-              <h2 className="text-xl font-bold text-white">Brokerage Connections</h2>
-              <span className="bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-md text-[10px] font-bold border border-border">
-                {data.snaptradeConnections.length} ACTIVE
-              </span>
-            </div>
-
-            {data.snaptradeConnections.length === 0 ? (
-              <div className="p-12 text-center border border-dashed border-border rounded-4xl">
-                <p className="text-zinc-600 font-medium italic italic">
-                  No active brokerage connections.
-                </p>
-              </div>
-            ) : (
-              <div className="bg-zinc-900 border border-border rounded-4xl overflow-hidden shadow-2xl">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-zinc-800/50 border-b border-border">
-                      <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
-                        Brokerage
-                      </th>
-                      <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
-                        Status
-                      </th>
-                      <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
-                        Last Synced
-                      </th>
-                      <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
-                        Actions
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {data.snaptradeConnections.map((conn) => (
-                      <tr key={conn.id} className="hover:bg-zinc-800/30 transition-colors group">
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-white group-hover:text-primary transition-colors">
-                            {conn.brokerage}
-                          </div>
-                          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter mt-0.5">
-                            ID: {conn.id}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
-                              conn.status === 'OK'
-                                ? 'bg-primary/10 text-primary border-primary/20'
-                                : conn.status === 'ACCOUNT_FETCH_ERROR'
-                                  ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
-                                  : 'bg-red-500/10 text-red-400 border-red-500/20'
-                            }`}
-                          >
-                            {conn.status === 'OK' ? 'SYNCED' : conn.status.replace(/_/g, ' ')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-zinc-400 font-medium">
-                          {conn.lastSynced ? (
-                            <>
-                              {new Date(conn.lastSynced).toLocaleDateString()} at{' '}
-                              {new Date(conn.lastSynced).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
-                            </>
-                          ) : (
-                            'PENDING SYNC'
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                            {conn.status === 'CONNECTION_ERROR' && (
-                              <button
-                                type="button"
-                                onClick={() => reconnectSnaptradeConnection()}
-                                className="px-4 py-1.5 bg-blue-500 text-white text-[11px] font-bold rounded-full hover:bg-blue-400 transition-all shadow-lg active:scale-95"
-                              >
-                                Reconnect
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => removeSnaptradeConnection(conn.id)}
                               className="px-4 py-1.5 bg-zinc-800 text-zinc-400 text-[11px] font-bold rounded-full border border-border hover:bg-red-500 hover:text-white hover:border-red-500 transition-all active:scale-95"
                             >
                               Disconnect

@@ -9,7 +9,7 @@ import (
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/plaid"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/serverauth"
-	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
+	// "github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Configures and starts the HTTP server with CORS support and protected routes.
@@ -54,13 +54,15 @@ func NewHandler() (http.Handler, error) {
 		plaidClient = client
 	}
 
-	// Initialize Snaptrade client
-	var snaptradeClient *snaptrade.Client
-	if client, err := snaptrade.NewClientFromEnv(); err != nil {
-		log.Printf("snaptrade client not configured: %v", err)
-	} else {
-		snaptradeClient = client
-	}
+	/*
+		// Initialize Snaptrade client
+		var snaptradeClient *snaptrade.Client
+		if client, err := snaptrade.NewClientFromEnv(); err != nil {
+			log.Printf("snaptrade client not configured: %v", err)
+		} else {
+			snaptradeClient = client
+		}
+	*/
 
 	// Health check endpoint
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
@@ -76,9 +78,9 @@ func NewHandler() (http.Handler, error) {
 	})))
 
 	deps := apiDependencies{
-		db:              dbClient,
-		plaidClient:     plaidClient,
-		snaptradeClient: snaptradeClient,
+		db:          dbClient,
+		plaidClient: plaidClient,
+		// snaptradeClient: snaptradeClient,
 	}
 
 	// Register all routes

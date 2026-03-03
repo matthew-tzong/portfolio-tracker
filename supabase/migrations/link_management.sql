@@ -24,18 +24,19 @@ CREATE TABLE IF NOT EXISTS plaid_accounts (
     current_balance DECIMAL(15, 2) NOT NULL DEFAULT 0
 );
 
--- Snaptrade User: stores the single Snaptrade user credentials for this app
-CREATE TABLE IF NOT EXISTS snaptrade_user (
-    id BIGSERIAL PRIMARY KEY,
-    user_id TEXT NOT NULL UNIQUE,
-    user_secret TEXT NOT NULL
-);
 
--- Snaptrade Connections: stores brokerage connections from Snaptrade
-CREATE TABLE IF NOT EXISTS snaptrade_connections (
-    id BIGSERIAL PRIMARY KEY,
-    conn_id TEXT NOT NULL UNIQUE,
-    brokerage TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'OK',
-    last_synced TIMESTAMPTZ
-);
+-- -- Snaptrade User: stores the single Snaptrade user credentials for this app
+-- CREATE TABLE IF NOT EXISTS snaptrade_user (
+--     id BIGSERIAL PRIMARY KEY,
+--     user_id TEXT NOT NULL UNIQUE,
+--     user_secret TEXT NOT NULL
+-- );
+
+-- -- Snaptrade Connections: stores brokerage connections from Snaptrade
+-- CREATE TABLE IF NOT EXISTS snaptrade_connections (
+--     id BIGSERIAL PRIMARY KEY,
+--     conn_id TEXT NOT NULL UNIQUE,
+--     brokerage TEXT NOT NULL,
+--     status TEXT NOT NULL DEFAULT 'OK',
+--     last_synced TIMESTAMPTZ
+-- );

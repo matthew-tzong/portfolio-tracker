@@ -8,7 +8,7 @@ import (
 
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/serverauth"
-	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
+	// "github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Account View Model
@@ -84,27 +84,13 @@ func handleGetAccounts(w http.ResponseWriter, r *http.Request, deps apiDependenc
 	)
 
 	// Converts the Plaid accounts to the AccountJSON view model.
-	// Plaid accounts only contribute to cash (HYSA, checking, CDs) or liabilities (credit cards).
+	// Plaid accounts contribute to cash (HYSA, checking, CDs), liabilities (credit cards), and investments (stocks, ETFs, etc).
 	for _, a := range plaidAccounts {
-		accountJSON, cashDelta, _, liabilityDelta := loadPlaidAccounts(a)
+		accountJSON, cashDelta, investmentsDelta, liabilityDelta := loadPlaidAccounts(a)
 		accounts = append(accounts, accountJSON)
 		cashCents += cashDelta
+		investmentsCents += investmentsDelta
 		liabilitiesCents += liabilityDelta
-	}
-
-	// Load Snaptrade accounts from the database.
-	if deps.snaptradeClient != nil {
-		snapUser, err := deps.db.GetSnaptradeUser(r.Context())
-		if err == nil && snapUser != nil {
-			snapAccounts, err := deps.snaptradeClient.ListAccounts(snapUser.UserID, snapUser.UserSecret)
-			if err == nil {
-				for _, a := range snapAccounts {
-					accountJSON, investDelta := loadSnaptradeAccounts(a)
-					accounts = append(accounts, accountJSON)
-					investmentsCents += investDelta
-				}
-			}
-		}
 	}
 
 	// Net worth = assets (cash + investments) - liabilities.
@@ -190,6 +176,8 @@ func loadPlaidAccounts(a database.PlaidAccount) (AccountJSON, int64, int64, int6
 	var cashDelta, investDelta, liabilityDelta int64
 	if isLiability {
 		liabilityDelta = rawCents
+	} else if isPlaidInvestment(a.Type) {
+		investDelta = rawCents
 	} else if isPlaidCash(a.Type, subtype) {
 		cashDelta = rawCents
 	} else {
@@ -210,6 +198,11 @@ func loadPlaidAccounts(a database.PlaidAccount) (AccountJSON, int64, int64, int6
 	}
 
 	return account, cashDelta, investDelta, liabilityDelta
+}
+
+// Returns true if the Plaid account should be treated as an investment.
+func isPlaidInvestment(accountType string) bool {
+	return accountType == "investment"
 }
 
 // Returns true if the Plaid account should be treated as a liability.
@@ -239,6 +232,7 @@ func isPlaidCash(accountType string, subtype *string) bool {
 	}
 }
 
+/*
 // Load Snaptrade Accounts from the database
 func loadSnaptradeAccounts(a snaptrade.Account) (AccountJSON, int64) {
 	balanceCents := int64(math.Round(a.BalanceAmount * 100))
@@ -264,3 +258,4 @@ func loadSnaptradeAccounts(a snaptrade.Account) (AccountJSON, int64) {
 
 	return account, balanceCents
 }
+*/

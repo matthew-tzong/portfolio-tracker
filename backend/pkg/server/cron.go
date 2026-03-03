@@ -12,6 +12,7 @@ import (
 
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/email"
+	// "github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Cron Response.
@@ -47,9 +48,13 @@ func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencie
 		return
 	}
 
-	// Update connection statuses for Plaid and Snaptrade.
+	// Update connection statuses for Plaid.
 	_ = checkAndUpdatePlaidItemStatuses(r.Context(), deps.db, deps.plaidClient)
-	_ = checkAndUpdateSnaptradeConnectionStatuses(r.Context(), deps.db, deps.snaptradeClient)
+
+	/*
+		// Update connection statuses for Snaptrade.
+		_ = checkAndUpdateSnaptradeConnectionStatuses(r.Context(), deps.db, deps.snaptradeClient)
+	*/
 
 	// Sync Plaid items with pending transactions.
 	plaidSynced, err := runPlaidSafetySync(r, deps)
@@ -58,12 +63,21 @@ func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencie
 		return
 	}
 
-	// Fetch Snaptrade holdings/balances and write today's snapshots.
-	dailyWritten, monthlyWritten, err := writeSnaptradeSnapshotsForToday(r, deps)
+	// Fetch Plaid investment holdings/balances and write today's snapshots.
+	dailyWritten, monthlyWritten, err := writeInvestmentSnapshotsForToday(r, deps)
 	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "Snaptrade snapshot failed: "+err.Error())
+		writeJSONError(w, http.StatusInternalServerError, "Investment snapshot failed: "+err.Error())
 		return
 	}
+
+	/*
+		// Fetch Snaptrade holdings/balances and write today's snapshots.
+		dailyWritten, monthlyWritten, err := writeSnaptradeSnapshotsForToday(r, deps)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Snaptrade snapshot failed: "+err.Error())
+			return
+		}
+	*/
 
 	// Run retention job to prune old data.
 	_ = runRetentionJob(r.Context(), deps)
@@ -100,6 +114,121 @@ func runPlaidSafetySync(r *http.Request, deps apiDependencies) (int, error) {
 	return len(items), nil
 }
 
+// Adds today's Plaid daily holdings/snapshots along with end of month monthly snapshots.
+func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bool, int, error) {
+	if deps.db == nil || deps.plaidClient == nil {
+		return false, 0, nil
+	}
+
+	// Fetch all Plaid items.
+	items, err := deps.db.ListPlaidItems(r.Context())
+	if err != nil {
+		return false, 0, err
+	}
+
+	// Sets the current time as the snapshot date.
+	now := time.Now().UTC()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+
+	var (
+		totalPortfolioCents int64
+		accountTotals       = make(map[string]int64)
+	)
+
+	for _, item := range items {
+		// Fetch accounts for this item to identify investment accounts.
+		accounts, err := deps.plaidClient.GetAccounts(r.Context(), item.AccessToken)
+		if err != nil {
+			log.Printf("cron: failed to get accounts for item %s: %v", item.ItemID, err)
+			continue
+		}
+
+		investmentAccountIDs := make(map[string]bool)
+		for _, acc := range accounts {
+			if acc.Type == "investment" {
+				investmentAccountIDs[acc.AccountID] = true
+				cents := int64(math.Round(acc.Balances.Current * 100))
+				totalPortfolioCents += cents
+				accountTotals[acc.AccountID] = cents
+			}
+		}
+
+		if len(investmentAccountIDs) == 0 {
+			continue
+		}
+
+		// Fetch holdings for this item.
+		plaidHoldings, securities, err := deps.plaidClient.GetHoldings(r.Context(), item.AccessToken)
+		if err != nil {
+			log.Printf("cron: failed to get holdings for item %s: %v", item.ItemID, err)
+			continue
+		}
+
+		// Map security IDs to tickers.
+		securityTickerMap := make(map[string]string)
+		for _, sec := range securities {
+			if sec.Ticker != nil {
+				securityTickerMap[sec.SecurityID] = *sec.Ticker
+			} else if sec.Name != nil {
+				securityTickerMap[sec.SecurityID] = *sec.Name
+			} else {
+				securityTickerMap[sec.SecurityID] = "UNKNOWN"
+			}
+		}
+
+		// Add holdings for investment accounts.
+		for _, ph := range plaidHoldings {
+			if !investmentAccountIDs[ph.AccountID] {
+				continue
+			}
+
+			var costBasisCents *int64
+			if ph.CostBasis != nil {
+				cbc := int64(math.Round(*ph.CostBasis * 100))
+				costBasisCents = &cbc
+			}
+
+			holding := &database.DailyHolding{
+				Date:           database.DateOnly{Time: today},
+				AccountID:      ph.AccountID,
+				Symbol:         securityTickerMap[ph.SecurityID],
+				Quantity:       ph.Quantity,
+				ValueCents:     int64(math.Round(ph.InstitutionValue * 100)),
+				CostBasisCents: costBasisCents,
+			}
+			err = deps.db.UpsertDailyHolding(r.Context(), holding)
+			if err != nil {
+				log.Printf("cron: failed to upsert daily holding for %s: %v", holding.Symbol, err)
+			}
+		}
+	}
+
+	// Writes today's total portfolio snapshot.
+	snapshot := &database.DailySnapshot{
+		Date:                database.DateOnly{Time: today},
+		PortfolioValueCents: totalPortfolioCents,
+	}
+	err = deps.db.UpsertDailySnapshot(r.Context(), snapshot)
+	if err != nil {
+		return false, 0, err
+	}
+
+	// Writes the monthly snapshots.
+	monthlyWritten, err := maybeWriteMonthlySnapshots(r, deps, today, accountTotals)
+	if err != nil {
+		return true, 0, err
+	}
+
+	// Writes the monthly net worth snapshot.
+	err = maybeWriteMonthlyNetWorth(r, deps, today, totalPortfolioCents)
+	if err != nil {
+		return true, monthlyWritten, err
+	}
+
+	return true, monthlyWritten, nil
+}
+
+/*
 // Adds today's Snaptrade daily holdings/snapshots along with end of month monthly snapshots.
 func writeSnaptradeSnapshotsForToday(r *http.Request, deps apiDependencies) (bool, int, error) {
 	if deps.db == nil || deps.snaptradeClient == nil {
@@ -179,6 +308,7 @@ func writeSnaptradeSnapshotsForToday(r *http.Request, deps apiDependencies) (boo
 
 	return true, monthlyWritten, nil
 }
+*/
 
 // If today is the end of the month, write per-account monthly snapshots using today's values.
 func maybeWriteMonthlySnapshots(r *http.Request, deps apiDependencies, today time.Time, accountTotals map[string]int64) (int, error) {

@@ -96,8 +96,6 @@ func (c *Client) doRequest(ctx context.Context, method, url string, body interfa
 	req.Header.Set("apikey", c.apiKey)
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("Content-Type", "application/json")
-	// PostgREST (Supabase REST) requires resolution=merge-duplicates for true upserts.
-	// We only add it when the request is clearly an upsert (POST + on_conflict=...).
 	prefer := "return=representation"
 	if method == http.MethodPost && strings.Contains(url, "on_conflict=") {
 		prefer += ",resolution=merge-duplicates"
@@ -353,6 +351,7 @@ func (c *Client) ListPlaidAccounts(ctx context.Context) ([]PlaidAccount, error) 
 	return accounts, nil
 }
 
+/*
 // Converts a SnaptradeConnection to its JSON-safe representation.
 func (s *SnaptradeConnection) ToJSON() SnaptradeConnectionJSON {
 	return SnaptradeConnectionJSON{
@@ -536,6 +535,7 @@ func (c *Client) DeleteSnaptradeConnection(ctx context.Context, connID string) e
 	}
 	return nil
 }
+*/
 
 // Returns all name-based category rules.
 func (c *Client) ListCategoryRules(ctx context.Context) ([]CategoryRule, error) {
@@ -925,6 +925,30 @@ func (c *Client) ListDailyHoldingsBySymbol(ctx context.Context, symbol string, s
 		return nil, err
 	}
 	return holdings, nil
+}
+
+// Returns the latest date present in the daily_holdings table.
+func (c *Client) GetLatestDailyHoldingsDate(ctx context.Context) (*time.Time, error) {
+	url := c.restURL("daily_holdings") + "?select=date&order=date.desc&limit=1"
+
+	resp, err := c.doRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, nil
+	}
+
+	var results []struct {
+		Date DateOnly `json:"date"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&results); err != nil || len(results) == 0 {
+		return nil, nil
+	}
+
+	return &results[0].Date.Time, nil
 }
 
 // Inserts or updates a monthly snapshot.
@@ -1318,6 +1342,7 @@ type PlaidAccount struct {
 	CurrentBalance float64 `json:"current_balance"`
 }
 
+/*
 // Represents a row in the snaptrade_user table.
 type SnaptradeUser struct {
 	ID         int64  `json:"id,omitempty"`
@@ -1341,6 +1366,7 @@ type SnaptradeConnectionJSON struct {
 	Status     string     `json:"status"`
 	LastSynced *time.Time `json:"lastSynced,omitempty"`
 }
+*/
 
 // Represents a row in the categories table.
 type Category struct {
@@ -1359,15 +1385,15 @@ type CategoryRule struct {
 
 // Represents a row in the transactions table.
 type Transaction struct {
-	ID                 int64    `json:"id,omitempty"`
-	PlaidAccountID     string   `json:"plaid_account_id"`
-	PlaidTransactionID string   `json:"plaid_transaction_id"`
-	Date               DateOnly `json:"date"`
-	AmountCents        int64    `json:"amount_cents"`
-	Name               string   `json:"name"`
-	MerchantName       *string  `json:"merchant_name"`
-	CategoryID         *int64   `json:"category_id"`
-	Pending            bool     `json:"pending"`
+	ID                 int64     `json:"id,omitempty"`
+	PlaidAccountID     string    `json:"plaid_account_id"`
+	PlaidTransactionID string    `json:"plaid_transaction_id"`
+	Date               DateOnly  `json:"date"`
+	AmountCents        int64     `json:"amount_cents"`
+	Name               string    `json:"name"`
+	MerchantName       *string   `json:"merchant_name"`
+	CategoryID         *int64    `json:"category_id"`
+	Pending            bool      `json:"pending"`
 	CreatedAt          time.Time `json:"created_at,omitempty"`
 	UpdatedAt          time.Time `json:"updated_at,omitempty"`
 }
@@ -1388,50 +1414,51 @@ type Budget struct {
 
 // Represents a row in the daily_snapshots table
 type DailySnapshot struct {
-	ID                  int64    `json:"id,omitempty"`
-	Date                DateOnly `json:"date"`
-	PortfolioValueCents int64    `json:"portfolio_value_cents"`
+	ID                  int64     `json:"id,omitempty"`
+	Date                DateOnly  `json:"date"`
+	PortfolioValueCents int64     `json:"portfolio_value_cents"`
 	CreatedAt           time.Time `json:"created_at,omitempty"`
 }
 
 // Represents a row in the daily_holdings table.
 type DailyHolding struct {
-	ID         int64    `json:"id,omitempty"`
-	Date       DateOnly `json:"date"`
-	AccountID  string   `json:"account_id"`
-	Symbol     string   `json:"symbol"`
-	Quantity   float64  `json:"quantity"`
-	ValueCents int64    `json:"value_cents"`
-	CreatedAt  time.Time `json:"created_at,omitempty"`
+	ID             int64     `json:"id,omitempty"`
+	Date           DateOnly  `json:"date"`
+	AccountID      string    `json:"account_id"`
+	Symbol         string    `json:"symbol"`
+	Quantity       float64   `json:"quantity"`
+	ValueCents     int64     `json:"value_cents"`
+	CostBasisCents *int64    `json:"cost_basis_cents,omitempty"`
+	CreatedAt      time.Time `json:"created_at,omitempty"`
 }
 
 // Represents a row in the monthly_snapshots table.
 type MonthlySnapshot struct {
-	ID                  int64    `json:"id,omitempty"`
-	Month               DateOnly `json:"month"`
-	AccountID           string   `json:"account_id"`
-	PortfolioValueCents int64    `json:"portfolio_value_cents"`
+	ID                  int64     `json:"id,omitempty"`
+	Month               DateOnly  `json:"month"`
+	AccountID           string    `json:"account_id"`
+	PortfolioValueCents int64     `json:"portfolio_value_cents"`
 	CreatedAt           time.Time `json:"created_at,omitempty"`
 }
 
 // Represents a row in the monthly_net_worth table.
 type MonthlyNetWorth struct {
-	ID               int64    `json:"id,omitempty"`
-	Month            DateOnly `json:"month"`
-	NetWorthCents    int64    `json:"net_worth_cents"`
-	CashCents        int64    `json:"cash_cents"`
-	InvestmentsCents int64    `json:"investments_cents"`
-	LiabilitiesCents int64    `json:"liabilities_cents"`
+	ID               int64     `json:"id,omitempty"`
+	Month            DateOnly  `json:"month"`
+	NetWorthCents    int64     `json:"net_worth_cents"`
+	CashCents        int64     `json:"cash_cents"`
+	InvestmentsCents int64     `json:"investments_cents"`
+	LiabilitiesCents int64     `json:"liabilities_cents"`
 	CreatedAt        time.Time `json:"created_at,omitempty"`
 }
 
 // Represents a row in the monthly_expense_summary table.
 type MonthlyExpenseSummary struct {
-	ID               int64    `json:"id,omitempty"`
-	Month            DateOnly `json:"month"`
-	CategoryID       int64    `json:"category_id"`
-	TotalCents       int64    `json:"total_cents"`
-	TransactionCount int      `json:"transaction_count"`
+	ID               int64     `json:"id,omitempty"`
+	Month            DateOnly  `json:"month"`
+	CategoryID       int64     `json:"category_id"`
+	TotalCents       int64     `json:"total_cents"`
+	TransactionCount int       `json:"transaction_count"`
 	CreatedAt        time.Time `json:"created_at,omitempty"`
 }
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
-	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
+	// "github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 func TestIsPlaidLiability(t *testing.T) {
@@ -93,6 +93,68 @@ func TestLoadPlaidAccountsNetWorthClassification(t *testing.T) {
 	}
 }
 
+func TestNetWorthFormulaWithPlaid(t *testing.T) {
+	checking := "checking"
+
+	plaidCash := database.PlaidAccount{
+		PlaidItemID:    "item-1",
+		AccountID:      "plaid-cash",
+		Name:           "Checking",
+		Type:           "depository",
+		Subtype:        &checking,
+		CurrentBalance: 100.00,
+	}
+
+	plaidCredit := database.PlaidAccount{
+		PlaidItemID:    "item-2",
+		AccountID:      "plaid-credit",
+		Name:           "Credit Card",
+		Type:           "credit",
+		CurrentBalance: 50.00,
+	}
+
+	plaidInvestment := database.PlaidAccount{
+		PlaidItemID:    "item-3",
+		AccountID:      "plaid-invest",
+		Name:           "Brokerage",
+		Type:           "investment",
+		CurrentBalance: 200.00,
+	}
+
+	var cashCents, liabilitiesCents, investmentsCents int64
+
+	_, cashDelta1, investDelta1, liabilityDelta1 := loadPlaidAccounts(plaidCash)
+	cashCents += cashDelta1
+	investmentsCents += investDelta1
+	liabilitiesCents += liabilityDelta1
+
+	_, cashDelta2, investDelta2, liabilityDelta2 := loadPlaidAccounts(plaidCredit)
+	cashCents += cashDelta2
+	investmentsCents += investDelta2
+	liabilitiesCents += liabilityDelta2
+
+	_, cashDelta3, investDelta3, liabilityDelta3 := loadPlaidAccounts(plaidInvestment)
+	cashCents += cashDelta3
+	investmentsCents += investDelta3
+	liabilitiesCents += liabilityDelta3
+
+	netWorth := cashCents + investmentsCents - liabilitiesCents
+
+	if cashCents != 10000 {
+		t.Fatalf("expected cash 10000, got %d", cashCents)
+	}
+	if liabilitiesCents != 5000 {
+		t.Fatalf("expected liabilities 5000, got %d", liabilitiesCents)
+	}
+	if investmentsCents != 20000 {
+		t.Fatalf("expected investments 20000, got %d", investmentsCents)
+	}
+	if netWorth != 25000 {
+		t.Fatalf("expected net worth 25000, got %d", netWorth)
+	}
+}
+
+/*
 func TestNetWorthFormulaWithPlaidAndSnaptrade(t *testing.T) {
 	checking := "checking"
 
@@ -113,12 +175,12 @@ func TestNetWorthFormulaWithPlaidAndSnaptrade(t *testing.T) {
 		CurrentBalance: 50.00,
 	}
 
-	snap := snaptrade.Account{
-		ID:            "snap-1",
-		Name:          "Brokerage",
-		Number:        "1234",
-		BalanceAmount: 200.00,
-	}
+	// snap := snaptrade.Account{
+	// 	ID:            "snap-1",
+	// 	Name:          "Brokerage",
+	// 	Number:        "1234",
+	// 	BalanceAmount: 200.00,
+	// }
 
 	var cashCents, liabilitiesCents, investmentsCents int64
 
@@ -148,3 +210,4 @@ func TestNetWorthFormulaWithPlaidAndSnaptrade(t *testing.T) {
 		t.Fatalf("expected net worth 25000, got %d", netWorth)
 	}
 }
+*/

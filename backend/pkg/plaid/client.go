@@ -46,6 +46,22 @@ func NewClientFromEnv() (*Client, error) {
 	}, nil
 }
 
+// Fetches investment holdings and securities for a given access token.
+func (c *Client) GetHoldings(ctx context.Context, accessToken string) ([]PlaidHolding, []PlaidSecurity, error) {
+	reqBody := investmentsHoldingsGetRequest{
+		ClientID:    c.clientID,
+		Secret:      c.secret,
+		AccessToken: accessToken,
+	}
+
+	var resp investmentsHoldingsGetResponse
+	err := c.postJSON(ctx, "/investments/holdings/get", reqBody, &resp)
+	if err != nil {
+		return nil, nil, err
+	}
+	return resp.Holdings, resp.Securities, nil
+}
+
 // Creates a Plaid Link token for the given user.
 func (c *Client) CreateLinkToken(ctx context.Context, userID, webhookURL string) (string, error) {
 	return c.CreateLinkTokenWithAccessToken(ctx, userID, "", webhookURL)
@@ -61,7 +77,7 @@ func (c *Client) CreateLinkTokenWithAccessToken(ctx context.Context, userID, acc
 		User: linkTokenUser{
 			ClientUserID: userID,
 		},
-		Products:     []string{"transactions"},
+		Products:     []string{"transactions", "investments"},
 		CountryCodes: []string{"US"},
 		Language:     "en",
 		Webhook:      webhookURL,
@@ -389,22 +405,22 @@ type TransactionsSyncResult struct {
 
 // PersonalFinanceCategory is Plaid's current categorization (returned by /transactions/sync).
 type PersonalFinanceCategory struct {
-	Primary string `json:"primary"`
+	Primary  string `json:"primary"`
 	Detailed string `json:"detailed,omitempty"`
 }
 
 // Transaction for transactions sync.
 type PlaidTransaction struct {
-	TransactionID            string                    `json:"transaction_id"`
-	AccountID                string                    `json:"account_id"`
-	Amount                   float64                   `json:"amount"`
-	Date                     string                    `json:"date"`
-	Name                     string                    `json:"name"`
-	MerchantName             *string                   `json:"merchant_name,omitempty"`
-	Category                 []string                  `json:"category,omitempty"`
-	CategoryID               *string                   `json:"category_id,omitempty"`
-	PersonalFinanceCategory  *PersonalFinanceCategory  `json:"personal_finance_category,omitempty"`
-	Pending                  bool                      `json:"pending"`
+	TransactionID           string                   `json:"transaction_id"`
+	AccountID               string                   `json:"account_id"`
+	Amount                  float64                  `json:"amount"`
+	Date                    string                   `json:"date"`
+	Name                    string                   `json:"name"`
+	MerchantName            *string                  `json:"merchant_name,omitempty"`
+	Category                []string                 `json:"category,omitempty"`
+	CategoryID              *string                  `json:"category_id,omitempty"`
+	PersonalFinanceCategory *PersonalFinanceCategory `json:"personal_finance_category,omitempty"`
+	Pending                 bool                     `json:"pending"`
 }
 
 // Removed transaction for transactions sync.
@@ -427,4 +443,36 @@ type transactionsSyncResponse struct {
 	Removed    []RemovedTransaction `json:"removed"`
 	NextCursor string               `json:"next_cursor"`
 	HasMore    bool                 `json:"has_more"`
+}
+
+// Request body for fetching investment holdings.
+type investmentsHoldingsGetRequest struct {
+	ClientID    string `json:"client_id"`
+	Secret      string `json:"secret"`
+	AccessToken string `json:"access_token"`
+}
+
+// Response body for fetching investment holdings.
+type investmentsHoldingsGetResponse struct {
+	Holdings   []PlaidHolding  `json:"holdings"`
+	Securities []PlaidSecurity `json:"securities"`
+}
+
+// Represents an investment holding.
+type PlaidHolding struct {
+	AccountID        string   `json:"account_id"`
+	SecurityID       string   `json:"security_id"`
+	InstitutionPrice float64  `json:"institution_price"`
+	InstitutionValue float64  `json:"institution_value"`
+	CostBasis        *float64 `json:"cost_basis,omitempty"`
+	Quantity         float64  `json:"quantity"`
+}
+
+// Represents a security (stock, ETF, etc.).
+type PlaidSecurity struct {
+	SecurityID string  `json:"security_id"`
+	Ticker     *string `json:"ticker_symbol"`
+	Name       *string `json:"name"`
+	Type       string  `json:"type"`
+	ClosePrice float64 `json:"close_price,omitempty"`
 }

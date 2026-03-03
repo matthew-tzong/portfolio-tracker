@@ -6,12 +6,10 @@
 
 ## What this app does
 
-- **Aggregates financial data** from:
-  - **Plaid** for bank and credit‑card accounts (balances + transactions).
-  - **Snaptrade** for brokerage accounts (positions and portfolio value).
+- **Aggregates financial data** from **Plaid** for banks, credit cards, and brokerages (balances, transactions, and holdings).
 - **Calculates current net worth** in one place by combining:
   - Cash (checking, savings, money market, etc.).
-  - Investments (brokerage accounts via Snaptrade).
+  - Investments (brokerage accounts via Plaid).
   - Liabilities (credit cards, loans).
 - **Tracks spending and budgets** using categorized Plaid transactions.
 - **Tracks portfolio performance** over time with daily and monthly snapshots.
@@ -28,7 +26,7 @@
 
 ### Accounts and net worth
 
-- **Unified accounts view** pulling from Plaid (banks/credit cards) and Snaptrade (brokerage).
+- **Unified accounts view** pulling from Plaid (banks, credit cards, and brokerage).
 - Each account is classified as **cash**, **investment**, or **liability**.
 - Net worth is computed as:
   - \(\text{cash} + \text{investments} - \text{liabilities}\)
@@ -61,9 +59,9 @@
   - Over‑budget categories highlighted.
   - Totals for *budgeted*, *spent*, and *remaining*.
 
-### Portfolio tracking (Snaptrade / Fidelity)
+### Portfolio tracking (Plaid)
 
-- Pulls **positions and account balances** from Snaptrade:
+- Pulls **positions and account balances** from Plaid:
   - Per‑account totals.
   - Per‑holding value (symbol, quantity, value in cents).
 - Stores **investment‑only snapshots**:
@@ -109,7 +107,7 @@
   - Backend validates Supabase JWTs and also checks against a single whitelisted email.
 
 - **Stack**
-  - **Backend**: Go HTTP server (JWT auth, Plaid + Snaptrade clients, cron + webhook endpoints).
+  - **Backend**: Go HTTP server (JWT auth, Plaid client, cron + webhook endpoints).
   - **Frontend**: React + TypeScript + Vite, with Tailwind CSS and a small component library for charts.
   - **Database & Auth**: Supabase (Postgres + Auth).
   - **Deploy model**: Single deploy through Vercel where the Go server also serves the built React app.
@@ -118,11 +116,10 @@
   - **Plaid**
     - Webhook (`SYNC_UPDATES_AVAILABLE`) marks items with new transactions.
     - Nightly cron calls a cursor‑based `/transactions/sync` only for items that actually changed.
-  - **Snaptrade**
     - Nightly cron fetches accounts and positions and writes that day’s `daily_snapshots` and `daily_holdings`.
     - On month‑end, writes per‑account `monthly_snapshots`.
   - **Frontend**
-    - Talks only to the Go API, which in turn talks to Supabase, Plaid, and Snaptrade.
+    - Talks only to the Go API, which in turn talks to Supabase and Plaid.
 
 - **Clean, testable code**
   - Business logic (categorization, net‑worth math, snapshot aggregation, retention) is implemented as small, test‑covered functions.
@@ -130,3 +127,5 @@
   - The repo includes GitHub Actions CI that runs Go tests, frontend tests, lint, and build on each push.
 
 For implementation details and the step‑by‑step vertical slices that shaped the app, see `TODO.md`,  `RETENTION.md`, `STATUS_CHECKING.md` and `.cursorrules`.
+
+Snaptrade has stopped support for personal use of certain brokerages, most notably Fidelity. Since Fidelity is a primary holding for many users, we have migrated investment tracking from Snaptrade to Plaid. SEe `MIGRATION_PLAID.md` for details.

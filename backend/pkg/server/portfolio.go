@@ -10,18 +10,20 @@ import (
 
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/serverauth"
+	// "github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Go's reference layout for YYYY-MM-DD.
 const dateLayout = "2006-01-02"
 
-// Current holding from Snaptrade in JSON format.
+// Current holding from Plaid in JSON format.
 type HoldingJSON struct {
-	AccountID   string  `json:"accountId"`
-	AccountName string  `json:"accountName"`
-	Symbol      string  `json:"symbol"`
-	Quantity    float64 `json:"quantity"`
-	ValueCents  int64   `json:"valueCents"`
+	AccountID      string  `json:"accountId"`
+	AccountName    string  `json:"accountName"`
+	Symbol         string  `json:"symbol"`
+	Quantity       float64 `json:"quantity"`
+	ValueCents     int64   `json:"valueCents"`
+	CostBasisCents *int64  `json:"costBasisCents,omitempty"`
 }
 
 // Current holdings response.
@@ -37,12 +39,13 @@ type SnapshotDataPoint struct {
 
 // Holding data point for charts in JSON format.
 type HoldingDataPoint struct {
-	Date        string  `json:"date"`
-	AccountID   string  `json:"accountId"`
-	AccountName string  `json:"accountName,omitempty"`
-	Symbol      string  `json:"symbol"`
-	Quantity    float64 `json:"quantity,omitempty"`
-	ValueCents  int64   `json:"valueCents"`
+	Date           string  `json:"date"`
+	AccountID      string  `json:"accountId"`
+	AccountName    string  `json:"accountName,omitempty"`
+	Symbol         string  `json:"symbol"`
+	Quantity       float64 `json:"quantity,omitempty"`
+	ValueCents     int64   `json:"valueCents"`
+	CostBasisCents *int64  `json:"costBasisCents,omitempty"`
 }
 
 // Portfolio snapshots response.
@@ -70,7 +73,7 @@ type yearlyPortfolioSummaryResponse struct {
 
 // Registers the portfolio routes.
 func registerPortfolioRoutes(mux *http.ServeMux, deps apiDependencies) {
-	// GET /api/portfolio/holdings returns current positions from Snaptrade.
+	// GET /api/portfolio/holdings returns current positions from Plaid.
 	mux.Handle("/api/portfolio/holdings", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			methodNotAllowed(w, http.MethodGet)
@@ -107,6 +110,68 @@ func registerPortfolioRoutes(mux *http.ServeMux, deps apiDependencies) {
 	})))
 }
 
+// Fetches current holdings from Plaid.
+func handleGetHoldings(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if deps.db == nil {
+		writeJSONError(w, http.StatusInternalServerError, "database not configured")
+		return
+	}
+
+	// Validate the authenticated user exists
+	if userID, ok := serverauth.UserIDFromContext(r.Context()); !ok || userID == "" {
+		writeJSONError(w, http.StatusUnauthorized, "missing authenticated user")
+		return
+	}
+
+	// Fetch Plaid accounts to get account IDs and names.
+	plaidAccounts, err := deps.db.ListPlaidAccounts(r.Context())
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to list Plaid accounts: "+err.Error())
+		return
+	}
+	accountNameMap := make(map[string]string)
+	for _, a := range plaidAccounts {
+		accountNameMap[a.AccountID] = a.Name
+	}
+
+	// Fetch the latest date available in the daily_holdings table.
+	latestDate, err := deps.db.GetLatestDailyHoldingsDate(r.Context())
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to get latest holdings date: "+err.Error())
+		return
+	}
+
+	var holdings []HoldingJSON
+	if latestDate != nil {
+		// Fetch all holdings for that specific latest date.
+		plaidHoldings, err := deps.db.ListDailyHoldings(r.Context(), *latestDate, *latestDate)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "failed to list latest daily holdings: "+err.Error())
+			return
+		}
+
+		for _, h := range plaidHoldings {
+			holdings = append(holdings, HoldingJSON{
+				AccountID:      h.AccountID,
+				AccountName:    accountNameMap[h.AccountID],
+				Symbol:         h.Symbol,
+				Quantity:       h.Quantity,
+				ValueCents:     h.ValueCents,
+				CostBasisCents: h.CostBasisCents,
+			})
+		}
+	}
+
+	resp := HoldingsResponse{
+		Holdings: holdings,
+	}
+
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+/*
 // Fetches current holdings from Snaptrade.
 func handleGetHoldings(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
 	w.Header().Set("Content-Type", "application/json")
@@ -166,6 +231,7 @@ func handleGetHoldings(w http.ResponseWriter, r *http.Request, deps apiDependenc
 
 	_ = json.NewEncoder(w).Encode(resp)
 }
+*/
 
 // Fetches daily and monthly snapshot data.
 func handleGetSnapshots(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
@@ -301,12 +367,13 @@ func handleGetHoldingsHistory(w http.ResponseWriter, r *http.Request, deps apiDe
 	dailyPoints := make([]HoldingDataPoint, 0, len(dailyHoldings))
 	for _, holding := range dailyHoldings {
 		dailyPoints = append(dailyPoints, HoldingDataPoint{
-			Date:        holding.Date.Format(dateLayout),
-			AccountID:   holding.AccountID,
-			AccountName: accountMap[holding.AccountID],
-			Symbol:      holding.Symbol,
-			Quantity:    holding.Quantity,
-			ValueCents:  holding.ValueCents,
+			Date:           holding.Date.Format(dateLayout),
+			AccountID:      holding.AccountID,
+			AccountName:    accountMap[holding.AccountID],
+			Symbol:         holding.Symbol,
+			Quantity:       holding.Quantity,
+			ValueCents:     holding.ValueCents,
+			CostBasisCents: holding.CostBasisCents,
 		})
 	}
 

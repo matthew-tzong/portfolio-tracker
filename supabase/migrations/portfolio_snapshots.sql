@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS daily_holdings (
   quantity NUMERIC(20, 8) NOT NULL,
   value_cents BIGINT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  cost_basis_cents BIGINT NOT NULL,
   UNIQUE(date, account_id, symbol)
 );
 

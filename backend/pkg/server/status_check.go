@@ -8,7 +8,7 @@ import (
 
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/plaid"
-	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
+	// "github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Checks and updates the status of all Plaid items.
@@ -34,7 +34,7 @@ func checkAndUpdatePlaidItemStatuses(ctx context.Context, db *database.Client, p
 			if errors.As(err, &plaidErr) && plaidErr.IsAuthError {
 				items[i].Status = plaidErr.ErrorCode
 				items[i].LastUpdated = now
-				err := db.UpdatePlaidItemStatus(ctx, items[i].ItemID, items[i].Status, items[i].LastUpdated); 
+				err := db.UpdatePlaidItemStatus(ctx, items[i].ItemID, items[i].Status, items[i].LastUpdated)
 				if err != nil {
 					log.Printf("status_check: update plaid item %s after auth error: %v", items[i].ItemID, err)
 				}
@@ -50,7 +50,7 @@ func checkAndUpdatePlaidItemStatuses(ctx context.Context, db *database.Client, p
 		if itemStatus.Error != nil && plaid.IsAuthErrorCode(itemStatus.Error.ErrorCode) {
 			items[i].Status = itemStatus.Error.ErrorCode
 			items[i].LastUpdated = now
-			err := db.UpdatePlaidItemStatus(ctx, items[i].ItemID, items[i].Status, items[i].LastUpdated); 
+			err := db.UpdatePlaidItemStatus(ctx, items[i].ItemID, items[i].Status, items[i].LastUpdated)
 			if err != nil {
 				log.Printf("status_check: update plaid item %s after embedded auth error %s: %v", items[i].ItemID, itemStatus.Error.ErrorCode, err)
 			}
@@ -61,7 +61,7 @@ func checkAndUpdatePlaidItemStatuses(ctx context.Context, db *database.Client, p
 		if items[i].Status != "OK" {
 			items[i].Status = "OK"
 			items[i].LastUpdated = now
-			err := db.UpdatePlaidItemStatus(ctx, items[i].ItemID, items[i].Status, items[i].LastUpdated); 
+			err := db.UpdatePlaidItemStatus(ctx, items[i].ItemID, items[i].Status, items[i].LastUpdated)
 			if err != nil {
 				log.Printf("status_check: update plaid item %s to OK: %v", items[i].ItemID, err)
 			}
@@ -71,6 +71,7 @@ func checkAndUpdatePlaidItemStatuses(ctx context.Context, db *database.Client, p
 	return nil
 }
 
+/*
 // Checks and updates the status of all Snaptrade connections.
 // Uses a 2-strike system to avoid false positives from transient errors:
 func checkAndUpdateSnaptradeConnectionStatuses(ctx context.Context, db *database.Client, snapClient *snaptrade.Client) error {
@@ -166,3 +167,4 @@ func checkAndUpdateSnaptradeConnectionStatuses(ctx context.Context, db *database
 
 	return nil
 }
+*/

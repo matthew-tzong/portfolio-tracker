@@ -9,14 +9,13 @@ import (
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/plaid"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/serverauth"
-	"github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
 // Client dependencies for the link management routes.
 type apiDependencies struct {
-	db              *database.Client
-	plaidClient     *plaid.Client
-	snaptradeClient *snaptrade.Client
+	db          *database.Client
+	plaidClient *plaid.Client
+	// snaptradeClient *snaptrade.Client
 }
 
 // Exchange Plaid public token request format.
@@ -31,10 +30,10 @@ type removePlaidItemRequest struct {
 	ItemID string `json:"itemId"`
 }
 
-// Remove Snaptrade connection request format.
-type removeSnaptradeConnectionRequest struct {
-	ConnectionID string `json:"connectionId"`
-}
+// // Remove Snaptrade connection request format.
+// type removeSnaptradeConnectionRequest struct {
+// 	ConnectionID string `json:"connectionId"`
+// }
 
 // Reconnect Plaid item request format.
 type reconnectPlaidItemRequest struct {
@@ -53,14 +52,16 @@ type exchangeTokenResponse struct {
 
 // List links response format.
 type linksResponse struct {
-	PlaidItems           []database.PlaidItemJSON           `json:"plaidItems"`
-	SnaptradeConnections []database.SnaptradeConnectionJSON `json:"snaptradeConnections"`
+	PlaidItems []database.PlaidItemJSON `json:"plaidItems"`
+	// SnaptradeConnections []database.SnaptradeConnectionJSON `json:"snaptradeConnections"`
 }
 
+/*
 // Connect URL response format.
 type connectURLResponse struct {
 	RedirectURI string `json:"redirectUri"`
 }
+*/
 
 // Error response format.
 type errorResponse struct {
@@ -96,7 +97,7 @@ func registerLinkManagementRoutes(mux *http.ServeMux, deps apiDependencies) {
 		handleExchangePlaidPublicToken(w, r, deps)
 	})))
 
-	// GET /api/links lists all Plaid items and Snaptrade connections.
+	// GET /api/links lists all Plaid items.
 	mux.Handle("/api/links", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			methodNotAllowed(w, http.MethodGet)
@@ -112,33 +113,6 @@ func registerLinkManagementRoutes(mux *http.ServeMux, deps apiDependencies) {
 			return
 		}
 		handleRemovePlaidItem(w, r, deps)
-	})))
-
-	// POST /api/snaptrade/connect-url generates a URL for the Snaptrade Connection Portal.
-	mux.Handle("/api/snaptrade/connect-url", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			methodNotAllowed(w, http.MethodPost)
-			return
-		}
-		handleSnaptradeConnectURL(w, r, deps)
-	})))
-
-	// POST /api/snaptrade/sync-connections syncs Snaptrade connections from the API into the database.
-	mux.Handle("/api/snaptrade/sync-connections", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			methodNotAllowed(w, http.MethodPost)
-			return
-		}
-		handleSnaptradeSyncConnections(w, r, deps)
-	})))
-
-	// POST /api/snaptrade/remove-connection removes a Snaptrade connection.
-	mux.Handle("/api/snaptrade/remove-connection", serverauth.JWTAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			methodNotAllowed(w, http.MethodPost)
-			return
-		}
-		handleRemoveSnaptradeConnection(w, r, deps)
 	})))
 }
 
@@ -284,7 +258,7 @@ func handleExchangePlaidPublicToken(w http.ResponseWriter, r *http.Request, deps
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// Lists all Plaid items and Snaptrade connections from the database.
+// Lists all Plaid items from the database.
 func handleListLinks(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -301,11 +275,11 @@ func handleListLinks(w http.ResponseWriter, r *http.Request, deps apiDependencie
 	}
 
 	// Fetch Snaptrade connections
-	snapConns, err := deps.db.ListSnaptradeConnections(r.Context())
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to list Snaptrade connections: "+err.Error())
-		return
-	}
+	// snapConns, err := deps.db.ListSnaptradeConnections(r.Context())
+	// if err != nil {
+	// 	writeJSONError(w, http.StatusInternalServerError, "failed to list Snaptrade connections: "+err.Error())
+	// 	return
+	// }
 
 	// Convert to JSON-safe representations.
 	plaidJSON := []database.PlaidItemJSON{}
@@ -313,14 +287,14 @@ func handleListLinks(w http.ResponseWriter, r *http.Request, deps apiDependencie
 		plaidJSON = append(plaidJSON, item.ToJSON())
 	}
 
-	snapJSON := []database.SnaptradeConnectionJSON{}
-	for _, conn := range snapConns {
-		snapJSON = append(snapJSON, conn.ToJSON())
-	}
+	// snapJSON := []database.SnaptradeConnectionJSON{}
+	// for _, conn := range snapConns {
+	// 	snapJSON = append(snapJSON, conn.ToJSON())
+	// }
 
 	resp := linksResponse{
-		PlaidItems:           plaidJSON,
-		SnaptradeConnections: snapJSON,
+		PlaidItems: plaidJSON,
+		// SnaptradeConnections: snapJSON,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -369,169 +343,6 @@ func handleRemovePlaidItem(w http.ResponseWriter, r *http.Request, deps apiDepen
 	// Delete the item from the database.
 	if err := deps.db.DeletePlaidItem(r.Context(), req.ItemID); err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to delete Plaid item: "+err.Error())
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// Generates a URL for the Snaptrade Connection Portal.
-func handleSnaptradeConnectURL(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if deps.snaptradeClient == nil {
-		writeJSONError(w, http.StatusInternalServerError, "Snaptrade is not configured (missing environment variables)")
-		return
-	}
-
-	if deps.db == nil {
-		writeJSONError(w, http.StatusInternalServerError, "Database is not configured")
-		return
-	}
-
-	// Get the authenticated user ID.
-	userID, ok := serverauth.UserIDFromContext(r.Context())
-	if !ok || userID == "" {
-		writeJSONError(w, http.StatusUnauthorized, "missing authenticated user")
-		return
-	}
-
-	// Get existing Snaptrade user from DB.
-	user, err := deps.db.GetSnaptradeUser(r.Context())
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to fetch Snaptrade user: "+err.Error())
-		return
-	}
-
-	// If no user exists, create and register with Snaptrade and save to DB.
-	if user == nil {
-		userSecret, err := deps.snaptradeClient.RegisterUser(r.Context(), userID)
-		if err != nil {
-			writeJSONError(w, http.StatusBadGateway, "failed to register Snaptrade user: "+err.Error())
-			return
-		}
-
-		user, err = deps.db.CreateSnaptradeUser(r.Context(), userID, userSecret)
-		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, "failed to save Snaptrade user: "+err.Error())
-			return
-		}
-	}
-
-	redirectURI, err := deps.snaptradeClient.GenerateConnectionPortalURL(r.Context(), user.UserID, user.UserSecret)
-	if err != nil {
-		writeJSONError(w, http.StatusBadGateway, "failed to create Snaptrade Connect URL: "+err.Error())
-		return
-	}
-
-	resp := connectURLResponse{RedirectURI: redirectURI}
-	_ = json.NewEncoder(w).Encode(resp)
-}
-
-// Syncs Snaptrade connections from the Snaptrade API into the database and returns the updated list.
-func handleSnaptradeSyncConnections(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if deps.snaptradeClient == nil {
-		writeJSONError(w, http.StatusInternalServerError, "Snaptrade is not configured (missing environment variables)")
-		return
-	}
-
-	if deps.db == nil {
-		writeJSONError(w, http.StatusInternalServerError, "Database is not configured")
-		return
-	}
-
-	// Get existing Snaptrade user from DB.
-	user, err := deps.db.GetSnaptradeUser(r.Context())
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to fetch Snaptrade user: "+err.Error())
-		return
-	}
-
-	// If no user exists, return an empty response.
-	if user == nil {
-		resp := linksResponse{
-			PlaidItems:           nil,
-			SnaptradeConnections: []database.SnaptradeConnectionJSON{},
-		}
-		_ = json.NewEncoder(w).Encode(resp)
-		return
-	}
-
-	// Fetch connections from Snaptrade API and sync to database.
-	conns, err := deps.snaptradeClient.ListConnections(user.UserID, user.UserSecret)
-	if err != nil {
-		writeJSONError(w, http.StatusBadGateway, "failed to list Snaptrade connections: "+err.Error())
-		return
-	}
-
-	// Build DB records and upsert
-	now := time.Now().UTC()
-	var dbConns []database.SnaptradeConnection
-	for _, c := range conns {
-		dbConns = append(dbConns, database.SnaptradeConnection{
-			ConnID:     c.ID,
-			Brokerage:  c.Brokerage.Name,
-			Status:     "OK",
-			LastSynced: &now,
-		})
-	}
-
-	// Save the connections to the database.
-	if err := deps.db.UpsertSnaptradeConnections(r.Context(), dbConns); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to save Snaptrade connections: "+err.Error())
-		return
-	}
-
-	// Convert to JSON-safe representations.
-	var snapJSON []database.SnaptradeConnectionJSON
-	for _, c := range dbConns {
-		snapJSON = append(snapJSON, c.ToJSON())
-	}
-
-	// Return the connections.
-	resp := linksResponse{
-		PlaidItems:           nil,
-		SnaptradeConnections: snapJSON,
-	}
-	_ = json.NewEncoder(w).Encode(resp)
-}
-
-// Removes a Snaptrade connection.
-func handleRemoveSnaptradeConnection(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
-	w.Header().Set("Content-Type", "application/json")
-
-	if deps.db == nil {
-		writeJSONError(w, http.StatusInternalServerError, "Database is not configured")
-		return
-	}
-
-	// Parse the request body.
-	var req removeSnaptradeConnectionRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ConnectionID == "" {
-		writeJSONError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-
-	// Delete the connection from Snaptrade first
-	if deps.snaptradeClient != nil {
-		user, err := deps.db.GetSnaptradeUser(r.Context())
-		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, "failed to get Snaptrade user: "+err.Error())
-			return
-		}
-		if user != nil {
-			if err := deps.snaptradeClient.RemoveConnection(user.UserID, user.UserSecret, req.ConnectionID); err != nil {
-				writeJSONError(w, http.StatusBadGateway, "failed to remove Snaptrade connection: "+err.Error())
-				return
-			}
-		}
-	}
-
-	// Delete the connection from our database.
-	if err := deps.db.DeleteSnaptradeConnection(r.Context(), req.ConnectionID); err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to delete Snaptrade connection: "+err.Error())
 		return
 	}
 

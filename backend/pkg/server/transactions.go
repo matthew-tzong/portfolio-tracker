@@ -171,22 +171,22 @@ func SyncTransactionsForItem(ctx context.Context, db *database.Client, plaidClie
 // pfcPrimaryToPlaidName maps Plaid's category names to our category names.
 func pfcPrimaryToPlaidName(primary string) string {
 	m := map[string]string{
-		"BANK_FEES":                "Bank Fees",
-		"FOOD_AND_DRINK":           "Food and Drink",
-		"GENERAL_MERCHANDISE":      "Shops",
-		"TRAVEL":                   "Travel",
-		"TRANSPORTATION":           "Travel",
-		"TRANSFER_IN":              "Transfer",
-		"TRANSFER_OUT":             "Transfer",
-		"ENTERTAINMENT":            "Recreation",
-		"GENERAL_SERVICES":         "Service",
-		"HOME_IMPROVEMENT":         "Service",
-		"RENT_AND_UTILITIES":       "Rent and Utilities",
-		"MEDICAL":                  "Healthcare",
-		"PERSONAL_CARE":            "Personal",
+		"BANK_FEES":                 "Bank Fees",
+		"FOOD_AND_DRINK":            "Food and Drink",
+		"GENERAL_MERCHANDISE":       "Shops",
+		"TRAVEL":                    "Travel",
+		"TRANSPORTATION":            "Travel",
+		"TRANSFER_IN":               "Transfer",
+		"TRANSFER_OUT":              "Transfer",
+		"ENTERTAINMENT":             "Recreation",
+		"GENERAL_SERVICES":          "Service",
+		"HOME_IMPROVEMENT":          "Service",
+		"RENT_AND_UTILITIES":        "Rent and Utilities",
+		"MEDICAL":                   "Healthcare",
+		"PERSONAL_CARE":             "Personal",
 		"GOVERNMENT_AND_NON_PROFIT": "Government and Non-Profit",
-		"INCOME":                   "Income",
-		"LOAN_PAYMENTS":            "Payment",
+		"INCOME":                    "Income",
+		"LOAN_PAYMENTS":             "Payment",
 	}
 	if name, ok := m[primary]; ok {
 		return name

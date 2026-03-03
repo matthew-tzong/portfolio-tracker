@@ -378,8 +378,9 @@ export function BudgetTracker() {
                                 </span>
                               ) : (
                                 <span
-                                  className={`font-bold ${remainingCents < 0 ? 'text-red-500' : 'text-primary'
-                                    }`}
+                                  className={`font-bold ${
+                                    remainingCents < 0 ? 'text-red-500' : 'text-primary'
+                                  }`}
                                 >
                                   {formatCurrency(remainingCents)}
                                 </span>
@@ -433,10 +434,10 @@ export function BudgetTracker() {
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
                     ) -
-                    Object.values(spent).reduce(
-                      (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                      0,
-                    ),
+                      Object.values(spent).reduce(
+                        (sum, value) => sum + (typeof value === 'number' ? value : 0),
+                        0,
+                      ),
                   )}
                 </p>
               </div>

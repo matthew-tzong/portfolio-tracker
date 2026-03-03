@@ -413,7 +413,7 @@ export function Portfolio() {
         )}
         {!holdingsLoading && holdingsList.length === 0 && !holdingsError && (
           <p className="text-sm text-zinc-500 font-medium">
-            No holdings. Connect a Snaptrade account to see positions.
+            No holdings. Connect a Plaid account to see positions.
           </p>
         )}
         {holdingsList.length > 0 && (
@@ -439,34 +439,39 @@ export function Portfolio() {
             )}
             {holdingsList.length > 0 && (
               <div className="p-2 space-y-2">
-                {/* Clickable total row */}
-                <button
-                  type="button"
-                  onClick={() => setSelected(selected?.type === 'total' ? null : { type: 'total' })}
-                  className={`w-full text-left p-6 rounded-3xl transition-all duration-300 group ${selected?.type === 'total'
-                      ? 'bg-zinc-800 border border-zinc-700'
-                      : 'hover:bg-zinc-800/50 border border-transparent'
+                {/* Clickable total row - show if holdings exist OR if snapshots exist */}
+                {(holdingsList.length > 0 || (snapshots?.daily && snapshots.daily.length > 0)) && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelected(selected?.type === 'total' ? null : { type: 'total' })
+                    }
+                    className={`w-full text-left p-6 rounded-3xl transition-all duration-300 group ${
+                      selected?.type === 'total'
+                        ? 'bg-zinc-800 border border-zinc-700'
+                        : 'hover:bg-zinc-800/50 border border-transparent'
                     }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${selected?.type === 'total' ? 'bg-primary text-background' : 'bg-zinc-800 text-zinc-400'}`}
-                      >
-                        <span className="font-bold text-lg">Σ</span>
-                      </div>
-                      <div>
-                        <span className="font-bold text-white text-lg">Total portfolio</span>
-                        <div className="text-xs text-zinc-500 font-medium mt-0.5">
-                          30-day and 12-month performance
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors ${selected?.type === 'total' ? 'bg-primary text-background' : 'bg-zinc-800 text-zinc-400'}`}
+                        >
+                          <span className="font-bold text-lg">Σ</span>
+                        </div>
+                        <div>
+                          <span className="font-bold text-white text-lg">Total portfolio</span>
+                          <div className="text-xs text-zinc-500 font-medium mt-0.5">
+                            30-day and 12-month performance
+                          </div>
                         </div>
                       </div>
+                      <span className="text-xl font-bold text-white">
+                        {formatCurrency(totalPortfolioValue)}
+                      </span>
                     </div>
-                    <span className="text-xl font-bold text-white">
-                      {formatCurrency(totalPortfolioValue)}
-                    </span>
-                  </div>
-                </button>
+                  </button>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 px-2 pb-2">
                   {Object.entries(holdingsByAccount).map(([accountId, accountData]) => (
@@ -479,16 +484,17 @@ export function Portfolio() {
                             selected?.type === 'account' && selected.accountId === accountId
                               ? null
                               : {
-                                type: 'account',
-                                accountId,
-                                accountName: accountData.accountName,
-                              },
+                                  type: 'account',
+                                  accountId,
+                                  accountName: accountData.accountName,
+                                },
                           )
                         }
-                        className={`w-full text-left p-5 rounded-3xl border transition-all duration-300 ${selected?.type === 'account' && selected.accountId === accountId
+                        className={`w-full text-left p-5 rounded-3xl border transition-all duration-300 ${
+                          selected?.type === 'account' && selected.accountId === accountId
                             ? 'bg-zinc-800 border-zinc-700'
                             : 'bg-zinc-900 border-border hover:border-zinc-700 hover:bg-zinc-800/40'
-                          }`}
+                        }`}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-bold text-white truncate mr-2">
@@ -500,38 +506,46 @@ export function Portfolio() {
                           {formatCurrency(accountData.totalValue)}
                         </span>
                       </button>
-                      {/* Holdings within account - show mini list */}
-                      <div className="space-y-1">
-                        {accountData.holdings.map((h, idx) => (
-                          <button
-                            type="button"
-                            key={`${h.accountId}-${h.symbol}-${idx}`}
-                            onClick={() =>
-                              setSelected(
-                                selected?.type === 'holding' &&
-                                  selected.accountId === h.accountId &&
-                                  selected.symbol === h.symbol
-                                  ? null
-                                  : {
-                                    type: 'holding',
-                                    accountId: h.accountId,
-                                    accountName: h.accountName,
-                                    symbol: h.symbol,
-                                  },
-                              )
-                            }
-                            className={`w-full text-left px-5 py-3 rounded-2xl flex items-center justify-between text-xs font-medium transition-all ${selected?.type === 'holding' &&
-                                selected.accountId === h.accountId &&
-                                selected.symbol === h.symbol
-                                ? 'bg-primary/10 text-primary border border-primary/20'
-                                : 'hover:bg-zinc-800 text-zinc-400 border border-transparent'
-                              }`}
-                          >
-                            <span className="font-bold">{h.symbol}</span>
-                            <span>{formatCurrency(h.valueCents)}</span>
-                          </button>
-                        ))}
-                      </div>
+                      {/* Holdings within account - show mini list only when selected (account or holding within account) */}
+                      {((selected?.type === 'account' && selected.accountId === accountId) ||
+                        (selected?.type === 'holding' && selected.accountId === accountId)) && (
+                        <div className="space-y-1 mt-1">
+                          {accountData.holdings.map((h, idx) => {
+                            const isSelectedHolding =
+                              selected?.type === 'holding' &&
+                              selected.accountId === h.accountId &&
+                              selected.symbol === h.symbol
+
+                            return (
+                              <button
+                                type="button"
+                                key={`${h.accountId}-${h.symbol}-${idx}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelected(
+                                    isSelectedHolding
+                                      ? { type: 'account', accountId, accountName: h.accountName }
+                                      : {
+                                          type: 'holding',
+                                          accountId: h.accountId,
+                                          accountName: h.accountName,
+                                          symbol: h.symbol,
+                                        },
+                                  )
+                                }}
+                                className={`w-full text-left px-5 py-3 rounded-2xl flex items-center justify-between text-xs font-medium transition-all ${
+                                  isSelectedHolding
+                                    ? 'bg-primary/10 text-primary border border-primary/20'
+                                    : 'hover:bg-zinc-800 text-zinc-400 border border-transparent'
+                                }`}
+                              >
+                                <span className="font-bold">{h.symbol}</span>
+                                <span>{formatCurrency(h.valueCents)}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

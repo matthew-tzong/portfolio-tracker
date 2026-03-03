@@ -50,9 +50,7 @@ export function BudgetBarChart({ title, data, height = 320 }: BudgetBarChartProp
 
   return (
     <div className="w-full">
-      <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6">
-        {title}
-      </h3>
+      <h3 className="text-sm font-bold text-white uppercase tracking-widest mb-6">{title}</h3>
       <div style={{ width: '100%', minWidth: 0, minHeight: height }}>
         <ResponsiveContainer width="100%" height={height}>
           <BarChart
