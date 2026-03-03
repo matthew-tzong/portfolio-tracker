@@ -161,15 +161,37 @@ export function LinkManagement() {
       )}
 
       {/* Add new connections cards */}
-      <div className="grid gap-8 md:grid-cols-2 mb-12">
+      <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3 mb-12">
         <div className="p-8 bg-zinc-900 border border-border rounded-4xl group hover:border-blue-500/30 transition-all shadow-xl relative overflow-hidden">
           <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all" />
           <div className="relative">
-            <h2 className="text-xl font-bold text-white mb-2">Plaid Connections</h2>
+            <h2 className="text-xl font-bold text-white mb-2">Banking & Credit</h2>
             <p className="text-zinc-500 text-sm font-medium mb-8 leading-relaxed">
-              Connect your bank and brokerage accounts via Plaid to sync balances and holdings.
+              Connect checking, savings, and credit card accounts for budget tracking.
             </p>
-            <PlaidLinkButton onLinked={load} />
+            <PlaidLinkButton onLinked={load} products={['transactions']} />
+          </div>
+        </div>
+
+        <div className="p-8 bg-zinc-900 border border-border rounded-4xl group hover:border-emerald-500/30 transition-all shadow-xl relative overflow-hidden">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all" />
+          <div className="relative">
+            <h2 className="text-xl font-bold text-white mb-2">Investments</h2>
+            <p className="text-zinc-500 text-sm font-medium mb-8 leading-relaxed">
+              Connect brokerage and retirement accounts to sync holdings and performance.
+            </p>
+            <PlaidLinkButton onLinked={load} products={['investments']} />
+          </div>
+        </div>
+
+        <div className="p-8 bg-zinc-900 border border-border rounded-4xl group hover:border-purple-500/30 transition-all shadow-xl relative overflow-hidden text-center md:col-span-2 lg:col-span-1">
+          <div className="absolute -right-4 -top-4 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all" />
+          <div className="relative">
+            <h2 className="text-xl font-bold text-white mb-2">Full Sync</h2>
+            <p className="text-zinc-500 text-sm font-medium mb-8 leading-relaxed">
+              Connect institutions that handle both banking and investments.
+            </p>
+            <PlaidLinkButton onLinked={load} products={['transactions', 'investments']} />
           </div>
         </div>
       </div>
@@ -225,11 +247,10 @@ export function LinkManagement() {
                         </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
-                              item.status === 'OK'
+                            className={`px-3 py-1 rounded-full text-[10px] font-bold border ${item.status === 'OK'
                                 ? 'bg-primary/10 text-primary border-primary/20'
                                 : 'bg-red-500/10 text-red-400 border-red-500/20'
-                            }`}
+                              }`}
                           >
                             {item.status === 'OK' ? 'CONNECTED' : item.status}
                           </span>

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
@@ -135,7 +136,17 @@ func handleCreatePlaidLinkToken(w http.ResponseWriter, r *http.Request, deps api
 	// Get the webhook URL from environment.
 	webhookURL := os.Getenv("PLAID_WEBHOOK_URL")
 
-	linkToken, err := deps.plaidClient.CreateLinkToken(r.Context(), userID, webhookURL)
+	// Get products from query parameter.
+	productsQuery := r.URL.Query().Get("products")
+	var products []string
+	if productsQuery != "" {
+		products = strings.Split(productsQuery, ",")
+	} else {
+		// Default to both if not specified.
+		products = []string{"transactions", "investments"}
+	}
+
+	linkToken, err := deps.plaidClient.CreateLinkToken(r.Context(), userID, webhookURL, products)
 	if err != nil {
 		writeJSONError(w, http.StatusBadGateway, "failed to create Plaid link token: "+err.Error())
 		return
@@ -401,7 +412,8 @@ func handleCreatePlaidReconnectLinkToken(w http.ResponseWriter, r *http.Request,
 	webhookURL := os.Getenv("PLAID_WEBHOOK_URL")
 
 	// Create a link token in update mode using the existing access token.
-	linkToken, err := deps.plaidClient.CreateLinkTokenWithAccessToken(r.Context(), userID, existingItem.AccessToken, webhookURL)
+	// We pass an empty slice for products because we just want to re-authorize the existing products.
+	linkToken, err := deps.plaidClient.CreateLinkTokenWithAccessToken(r.Context(), userID, existingItem.AccessToken, webhookURL, []string{})
 	if err != nil {
 		writeJSONError(w, http.StatusBadGateway, "failed to create reconnect link token: "+err.Error())
 		return

@@ -63,12 +63,12 @@ func (c *Client) GetHoldings(ctx context.Context, accessToken string) ([]PlaidHo
 }
 
 // Creates a Plaid Link token for the given user.
-func (c *Client) CreateLinkToken(ctx context.Context, userID, webhookURL string) (string, error) {
-	return c.CreateLinkTokenWithAccessToken(ctx, userID, "", webhookURL)
+func (c *Client) CreateLinkToken(ctx context.Context, userID, webhookURL string, products []string) (string, error) {
+	return c.CreateLinkTokenWithAccessToken(ctx, userID, "", webhookURL, products)
 }
 
 // Creates a Plaid Link token in update mode for reconnecting an existing item.
-func (c *Client) CreateLinkTokenWithAccessToken(ctx context.Context, userID, accessToken, webhookURL string) (string, error) {
+func (c *Client) CreateLinkTokenWithAccessToken(ctx context.Context, userID, accessToken, webhookURL string, products []string) (string, error) {
 	// Constructs the request body for the Plaid Link token create request.
 	reqBody := linkTokenCreateRequest{
 		ClientID:   c.clientID,
@@ -77,7 +77,7 @@ func (c *Client) CreateLinkTokenWithAccessToken(ctx context.Context, userID, acc
 		User: linkTokenUser{
 			ClientUserID: userID,
 		},
-		Products:     []string{"transactions", "investments"},
+		Products:     products,
 		CountryCodes: []string{"US"},
 		Language:     "en",
 		Webhook:      webhookURL,
@@ -85,6 +85,7 @@ func (c *Client) CreateLinkTokenWithAccessToken(ctx context.Context, userID, acc
 	// If accessToken is provided, use update mode to reconnect an existing item.
 	if accessToken != "" {
 		reqBody.AccessToken = &accessToken
+		reqBody.Products = nil
 	}
 
 	var resp linkTokenCreateResponse
