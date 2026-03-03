@@ -47,12 +47,12 @@ func NewClientFromEnv() (*Client, error) {
 }
 
 // Creates a Plaid Link token for the given user.
-func (c *Client) CreateLinkToken(ctx context.Context, userID string) (string, error) {
-	return c.CreateLinkTokenWithAccessToken(ctx, userID, "")
+func (c *Client) CreateLinkToken(ctx context.Context, userID, webhookURL string) (string, error) {
+	return c.CreateLinkTokenWithAccessToken(ctx, userID, "", webhookURL)
 }
 
 // Creates a Plaid Link token in update mode for reconnecting an existing item.
-func (c *Client) CreateLinkTokenWithAccessToken(ctx context.Context, userID, accessToken string) (string, error) {
+func (c *Client) CreateLinkTokenWithAccessToken(ctx context.Context, userID, accessToken, webhookURL string) (string, error) {
 	// Constructs the request body for the Plaid Link token create request.
 	reqBody := linkTokenCreateRequest{
 		ClientID:   c.clientID,
@@ -64,6 +64,7 @@ func (c *Client) CreateLinkTokenWithAccessToken(ctx context.Context, userID, acc
 		Products:     []string{"transactions"},
 		CountryCodes: []string{"US"},
 		Language:     "en",
+		Webhook:      webhookURL,
 	}
 	// If accessToken is provided, use update mode to reconnect an existing item.
 	if accessToken != "" {

@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
@@ -157,7 +158,10 @@ func handleCreatePlaidLinkToken(w http.ResponseWriter, r *http.Request, deps api
 		return
 	}
 
-	linkToken, err := deps.plaidClient.CreateLinkToken(r.Context(), userID)
+	// Get the webhook URL from environment.
+	webhookURL := os.Getenv("PLAID_WEBHOOK_URL")
+
+	linkToken, err := deps.plaidClient.CreateLinkToken(r.Context(), userID, webhookURL)
 	if err != nil {
 		writeJSONError(w, http.StatusBadGateway, "failed to create Plaid link token: "+err.Error())
 		return
@@ -582,8 +586,11 @@ func handleCreatePlaidReconnectLinkToken(w http.ResponseWriter, r *http.Request,
 		return
 	}
 
+	// Get the webhook URL from environment.
+	webhookURL := os.Getenv("PLAID_WEBHOOK_URL")
+
 	// Create a link token in update mode using the existing access token.
-	linkToken, err := deps.plaidClient.CreateLinkTokenWithAccessToken(r.Context(), userID, existingItem.AccessToken)
+	linkToken, err := deps.plaidClient.CreateLinkTokenWithAccessToken(r.Context(), userID, existingItem.AccessToken, webhookURL)
 	if err != nil {
 		writeJSONError(w, http.StatusBadGateway, "failed to create reconnect link token: "+err.Error())
 		return
