@@ -350,7 +350,7 @@ export function ExpenseTracker() {
                     Expenses
                   </span>
                   <p className="text-2xl font-bold text-red-500 tracking-tight">
-                    −{formatCurrency(summary.expensesCents)}
+                    {formatCurrency(summary.expensesCents)}
                   </p>
                 </div>
                 <div className="bg-zinc-900 border border-border p-6 rounded-3xl group hover:border-primary/30 transition-all">
@@ -358,7 +358,7 @@ export function ExpenseTracker() {
                     Net Savings
                   </span>
                   <p className="text-2xl font-bold text-white tracking-tight">
-                    {formatCurrency(summary.incomeCents - summary.expensesCents)}
+                    {formatCurrency(summary.incomeCents + summary.expensesCents)}
                   </p>
                 </div>
               </>

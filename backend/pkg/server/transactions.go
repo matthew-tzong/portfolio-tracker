@@ -652,7 +652,7 @@ func calculateMonthlySpentByCategory(ctx context.Context, dbClient *database.Cli
 		}
 
 		categoryName := category.Name
-		monthlySpending[categoryName] += -transaction.AmountCents
+		monthlySpending[categoryName] += transaction.AmountCents
 	}
 	return monthlySpending, nil
 }
