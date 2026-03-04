@@ -1,7 +1,7 @@
 # Migration from Snaptrade to Plaid for Investments
 
 ## Background
-Snaptrade has stopped support for personal use of certain brokerages, most notably Fidelity. Since Fidelity is a primary holding for many users, we have migrated investment tracking from Snaptrade to Plaid.
+Snaptrade has stopped support for personal use of certain brokerages, so we have migrated investment tracking from Snaptrade to Plaid.
 
 ## Changes Made
 - Updated Plaid client (`pkg/plaid/client.go`) to fetch investment holdings and securities.

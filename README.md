@@ -18,6 +18,7 @@
   - Portfolio value and per‑holding performance.
   - Expenses by category.
   - Budget vs. actual spend.
+- **Supports manual CSV uploads** for Fidelity statements and holdings, ensuring accurate tracking even when APIs are limited.
 - **Automatically prunes old data** while exporting it as CSV first, so the database stays small but long‑term summaries remain available.
   
 ---
@@ -71,10 +72,10 @@
 - The portfolio page shows:
   - Today’s total portfolio value.
   - Breakdown by account and by holding within each account.
-  - Performance views when you select:
-    - Total portfolio.
-    - A single account.
-    - A single holding.
+- **Manual Fidelity Integration**: 
+  - **Statement Uploads**: Supports uploading Fidelity brokerage statements (CSV) to retroactively fill historical monthly snapshots.
+  - **Position Uploads**: Supports uploading current "Positions" CSV from Fidelity to update today's holdings and portfolio value.
+  - **Seamless Merging**: Manual data is integrated with Plaid records to ensure a complete daily and monthly view even for accounts with limited API support.
 
 ### Charts and visualizations
 
@@ -128,4 +129,4 @@
 
 For implementation details and the step‑by‑step vertical slices that shaped the app, see `TODO.md`,  `RETENTION.md`, `STATUS_CHECKING.md` and `.cursorrules`.
 
-Snaptrade has stopped support for personal use of certain brokerages, most notably Fidelity. Since Fidelity is a primary holding for many users, we have migrated investment tracking from Snaptrade to Plaid. SEe `MIGRATION_PLAID.md` for details.
+Snaptrade has stopped support for personal use of certain brokerages, so we have migrated investment tracking from Snaptrade to Plaid. SEe `MIGRATION_PLAID.md` for details.
