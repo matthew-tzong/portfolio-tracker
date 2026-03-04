@@ -286,7 +286,7 @@ export function Portfolio() {
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+      const API_URL = import.meta.env.VITE_API_URL || ''
       const response = await fetch(
         `${API_URL}/api/export/portfolio/snapshots?month=${exportMonth}`,
         {
@@ -322,7 +322,7 @@ export function Portfolio() {
       const {
         data: { session },
       } = await supabase.auth.getSession()
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+      const API_URL = import.meta.env.VITE_API_URL || ''
       const response = await fetch(
         `${API_URL}/api/export/portfolio/holdings?month=${exportMonth}`,
         {
@@ -365,7 +365,7 @@ export function Portfolio() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+      const API_URL = import.meta.env.VITE_API_URL || ''
       const endpoint = type === 'statement' ? '/api/fidelity/upload-statement' : '/api/fidelity/upload-holdings'
 
       const response = await fetch(`${API_URL}${endpoint}`, {

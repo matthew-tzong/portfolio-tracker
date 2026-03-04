@@ -64,7 +64,7 @@ func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencie
 	}
 
 	// Fetch Plaid investment holdings/balances and write today's snapshots.
-	dailyWritten, monthlyWritten, err := writeInvestmentSnapshotsForToday(r, deps)
+	dailyWritten, err := writeInvestmentSnapshotsForToday(r, deps)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Investment snapshot failed: "+err.Error())
 		return
@@ -84,9 +84,8 @@ func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencie
 
 	// Returns the response.
 	resp := cronSyncResponse{
-		PlaidSyncedItems:        plaidSynced,
-		DailySnapshotWritten:    dailyWritten,
-		MonthlySnapshotsWritten: monthlyWritten,
+		PlaidSyncedItems:     plaidSynced,
+		DailySnapshotWritten: dailyWritten,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -118,15 +117,15 @@ func runPlaidSafetySync(r *http.Request, deps apiDependencies) (int, error) {
 }
 
 // Adds today's Plaid daily holdings/snapshots along with end of month monthly snapshots.
-func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bool, int, error) {
+func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bool, error) {
 	if deps.db == nil || deps.plaidClient == nil {
-		return false, 0, nil
+		return false, nil
 	}
 
 	// Fetch all Plaid items.
 	items, err := deps.db.ListPlaidItems(r.Context())
 	if err != nil {
-		return false, 0, err
+		return false, err
 	}
 
 	// Sets the current time as the snapshot date.
@@ -204,10 +203,10 @@ func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bo
 	// Update snapshots (daily and monthly) for today.
 	err = updatePortfolioSnapshots(r, deps, today)
 	if err != nil {
-		return false, 0, err
+		return false, err
 	}
 
-	return true, 1, nil // 1 monthly snapshot potentially written
+	return true, nil
 }
 
 /*
