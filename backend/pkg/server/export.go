@@ -82,8 +82,8 @@ func handleExportPortfolioSnapshots(w http.ResponseWriter, r *http.Request, deps
 		return
 	}
 
-	// Lists the monthly snapshots.
-	monthStart := time.Date(monthTime.Year(), monthTime.Month(), 1, 0, 0, 0, 0, time.UTC)
+	// Fetch monthly snapshots for the requested month.
+	monthStart := time.Date(monthTime.Year(), monthTime.Month(), 1, 0, 0, 0, 0, GetLocalLocation())
 	monthEnd := monthStart.AddDate(0, 1, -1)
 	snapshots, err := deps.db.ListMonthlySnapshots(r.Context(), monthStart, monthEnd)
 	if err != nil {
@@ -128,8 +128,9 @@ func handleExportPortfolioHoldings(w http.ResponseWriter, r *http.Request, deps 
 		writeJSONError(w, http.StatusBadRequest, "invalid month format (use YYYY-MM)")
 		return
 	}
-	startDate := time.Date(monthTime.Year(), monthTime.Month(), 1, 0, 0, 0, 0, time.UTC)
-	endDate := startDate.AddDate(0, 1, -1)
+	// Fetch daily holdings for the requested month.
+	startDate := time.Date(monthTime.Year(), monthTime.Month(), 1, 0, 0, 0, 0, GetLocalLocation())
+	endDate := monthTime.AddDate(0, 1, -1)
 
 	// Fetch daily holdings for the month.
 	holdings, err := deps.db.ListDailyHoldings(r.Context(), startDate, endDate)
@@ -144,7 +145,7 @@ func handleExportPortfolioHoldings(w http.ResponseWriter, r *http.Request, deps 
 		writeJSONError(w, http.StatusInternalServerError, "failed to fetch accounts: "+err.Error())
 		return
 	}
-	
+
 	accountMap := make(map[string]string)
 	for _, acc := range allAccounts {
 		accountMap[acc.AccountID] = acc.Name

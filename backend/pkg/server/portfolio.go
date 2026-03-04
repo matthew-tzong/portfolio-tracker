@@ -137,7 +137,7 @@ func handleGetHoldings(w http.ResponseWriter, r *http.Request, deps apiDependenc
 	}
 
 	// Loop through all accounts and fetch the latest holdings for each account.
-	var holdings []HoldingJSON
+	holdings := make([]HoldingJSON, 0)
 	for _, acc := range plaidAccounts {
 		latestDate, err := deps.db.GetLatestDailyHoldingsDateForAccount(r.Context(), acc.AccountID)
 		if err != nil || latestDate == nil {
@@ -262,8 +262,8 @@ func handleGetSnapshots(w http.ResponseWriter, r *http.Request, deps apiDependen
 	}
 
 	// List the monthly snapshots
-	monthlyStart := time.Date(now.Year()-2, 1, 1, 0, 0, 0, 0, time.UTC)
-	var monthlyPoints []SnapshotDataPoint
+	monthlyStart := time.Date(now.Year()-2, 1, 1, 0, 0, 0, 0, GetLocalLocation())
+	monthlyPoints := make([]SnapshotDataPoint, 0)
 	if accountID != "" {
 		// List the monthly snapshots for a given account.
 		byAccount, err := deps.db.ListMonthlySnapshotsByAccount(r.Context(), monthlyStart, dayStart, accountID)

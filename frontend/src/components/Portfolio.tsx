@@ -109,7 +109,7 @@ export function Portfolio() {
     setHoldingsError(null)
     try {
       const data = await apiRequest<HoldingsResponse>('/api/portfolio/holdings')
-      setHoldings(data.holdings)
+      setHoldings(data.holdings ?? [])
     } catch (err) {
       setHoldingsError(err instanceof Error ? err.message : 'Failed to load holdings')
     } finally {
@@ -122,7 +122,10 @@ export function Portfolio() {
     setSnapshotsLoading(true)
     try {
       const data = await apiRequest<SnapshotsResponse>('/api/portfolio/snapshots')
-      setSnapshots(data)
+      setSnapshots({
+        daily: data.daily ?? [],
+        monthly: data.monthly ?? [],
+      })
     } catch (err) {
       // Ignored for now as snapshotsError was removed for design simplicity
     } finally {

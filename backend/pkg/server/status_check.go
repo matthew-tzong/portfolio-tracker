@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"time"
 
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/plaid"
@@ -23,7 +22,7 @@ func checkAndUpdatePlaidItemStatuses(ctx context.Context, db *database.Client, p
 		return err
 	}
 
-	now := time.Now().UTC()
+	now := GetLocalNow()
 
 	// Check status of each item
 	for i := range items {
@@ -99,7 +98,7 @@ func checkAndUpdateSnaptradeConnectionStatuses(ctx context.Context, db *database
 	conns, err := snapClient.ListConnections(user.UserID, user.UserSecret)
 	if err != nil {
 		// If ListConnections fails, mark all connections based on 2-strike system:
-		now := time.Now().UTC()
+		now := GetLocalNow()
 		var dbConns []database.SnaptradeConnection
 
 		for _, conn := range existingConns {

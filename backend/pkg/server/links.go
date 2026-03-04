@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/plaid"
@@ -192,7 +191,7 @@ func handleExchangePlaidPublicToken(w http.ResponseWriter, r *http.Request, deps
 		return
 	}
 
-	now := time.Now().UTC()
+	now := GetLocalNow()
 
 	// Check if an item with the same institution_id already exists (for reconnection / rotation).
 	var existingItem *database.PlaidItem

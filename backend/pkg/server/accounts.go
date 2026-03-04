@@ -76,17 +76,16 @@ func handleGetAccounts(w http.ResponseWriter, r *http.Request, deps apiDependenc
 		return
 	}
 
+	// Converts the Plaid accounts to the AccountJSON view model.
+	// Plaid accounts contribute to cash (HYSA, checking, CDs), liabilities (credit cards), and investments (stocks, ETFs, etc).
+	accounts := make([]AccountJSON, 0)
 	var (
-		accounts         []AccountJSON
 		cashCents        int64
 		investmentsCents int64
 		liabilitiesCents int64
 	)
-
-	// Converts the Plaid accounts to the AccountJSON view model.
-	// Plaid accounts contribute to cash (HYSA, checking, CDs), liabilities (credit cards), and investments (stocks, ETFs, etc).
-	for _, a := range plaidAccounts {
-		accountJSON, cashDelta, investmentsDelta, liabilityDelta := loadPlaidAccounts(a)
+	for _, account := range plaidAccounts {
+		accountJSON, cashDelta, investmentsDelta, liabilityDelta := loadPlaidAccounts(account)
 		accounts = append(accounts, accountJSON)
 		cashCents += cashDelta
 		investmentsCents += investmentsDelta
@@ -117,9 +116,9 @@ func handleGetNetWorthSnapshots(w http.ResponseWriter, r *http.Request, deps api
 	}
 
 	// Default: return full history (no pruning) so long-term net worth is visible.
-	now := time.Now().UTC()
-	endMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	startMonth := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+	now := GetLocalNow()
+	endMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, GetLocalLocation())
+	startMonth := time.Date(1970, 1, 1, 0, 0, 0, 0, GetLocalLocation())
 	snapshots, err := deps.db.ListMonthlyNetWorth(r.Context(), startMonth, endMonth)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to list monthly net worth: "+err.Error())

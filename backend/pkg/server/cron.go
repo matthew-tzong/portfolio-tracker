@@ -233,8 +233,8 @@ func writeSnaptradeSnapshotsForToday(r *http.Request, deps apiDependencies) (boo
 	}
 
 	// Sets the current time as the snapshot date.
-	now := time.Now().UTC()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	now := GetLocalNow()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, GetLocalLocation())
 
 	var (
 		totalPortfolioCents int64
@@ -316,7 +316,7 @@ func maybeWriteMonthlyNetWorth(r *http.Request, deps apiDependencies, date time.
 
 	// Loop through all accounts and sum up cash, investments, and liabilities.
 	for _, account := range plaidAccounts {
-		if account.CreatedAt != nil && account.CreatedAt.After(time.Date(year, month+1, 0, 23, 59, 59, 0, time.UTC)) {
+		if account.CreatedAt != nil && account.CreatedAt.After(time.Date(year, month+1, 0, 23, 59, 59, 0, GetLocalLocation())) {
 			continue
 		}
 
@@ -357,7 +357,7 @@ func runRetentionJob(ctx context.Context, deps apiDependencies) error {
 
 	// Prunes 1 year old transactions on the first day of each month.
 	if today.Day() == 1 {
-		monthToPrune := time.Date(today.Year()-1, today.Month(), 1, 0, 0, 0, 0, time.UTC)
+		monthToPrune := time.Date(today.Year()-1, today.Month(), 1, 0, 0, 0, 0, GetLocalLocation())
 		transactions, err := deps.db.ListTransactionsForMonth(ctx, monthToPrune)
 		if err != nil {
 			log.Printf("retention: list transactions for month %s: %v", monthToPrune.Format("2006-01"), err)
@@ -391,7 +391,7 @@ func runRetentionJob(ctx context.Context, deps apiDependencies) error {
 	nextDay := dayBeingDeleted.AddDate(0, 0, 1)
 	if nextDay.Month() != dayBeingDeleted.Month() {
 		// Writes the monthly snapshot for the day being deleted.
-		monthStart := time.Date(dayBeingDeleted.Year(), dayBeingDeleted.Month(), 1, 0, 0, 0, 0, time.UTC)
+		monthStart := time.Date(dayBeingDeleted.Year(), dayBeingDeleted.Month(), 1, 0, 0, 0, 0, GetLocalLocation())
 		holdings, _ := deps.db.ListDailyHoldings(ctx, dayBeingDeleted, dayBeingDeleted)
 		if len(holdings) > 0 {
 			accountTotals := make(map[string]int64)
@@ -501,14 +501,14 @@ func createMonthlyExpenseSummary(ctx context.Context, deps apiDependencies, mont
 		}
 		_ = deps.db.UpsertMonthlyExpenseSummary(ctx, summary)
 	}
-
 	return nil
 }
 
 // Creates yearly summaries from monthly data for a given year.
 func createYearlyExpenseSummaries(ctx context.Context, deps apiDependencies, year int) error {
-	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, time.UTC)
-	yearEnd := time.Date(year, 12, 31, 0, 0, 0, 0, time.UTC)
+	// Lists all monthly snapshots for the year and aggregates them (investments only).
+	yearStart := time.Date(year, 1, 1, 0, 0, 0, 0, GetLocalLocation())
+	yearEnd := time.Date(year, 12, 31, 0, 0, 0, 0, GetLocalLocation())
 
 	// Aggregate monthly expense summaries by category.
 	monthlySummaries, err := deps.db.ListMonthlyExpenseSummaries(ctx, yearStart, yearEnd)

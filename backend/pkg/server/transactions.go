@@ -234,7 +234,7 @@ func plaidTransactionToDB(p plaid.PlaidTransaction, plaidNameToCategoryID map[st
 	}
 
 	// Returns the transaction.
-	now := time.Now().UTC()
+	now := GetLocalNow()
 	return database.Transaction{
 		PlaidAccountID:     p.AccountID,
 		PlaidTransactionID: p.TransactionID,
