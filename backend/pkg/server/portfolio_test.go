@@ -89,7 +89,7 @@ func TestBuildPortfolioSnapshotsCSVIncludesHeadersAndRows(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read header: %v", err)
 	}
-	if len(header) != 3 || header[0] != "Month" || header[1] != "Account ID" || header[2] != "Portfolio Value ($)" {
+	if len(header) != 3 || header[0] != "Month" || header[1] != "Account" || header[2] != "Portfolio Value ($)" {
 		t.Fatalf("unexpected header: %#v", header)
 	}
 
