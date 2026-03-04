@@ -25,15 +25,15 @@ type cronSyncResponse struct {
 // Registers cron routes.
 func registerCronRoutes(mux *http.ServeMux, deps apiDependencies) {
 	mux.HandleFunc("/api/cron/daily-sync", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			methodNotAllowed(w, http.MethodPost)
+		if r.Method != http.MethodGet {
+			methodNotAllowed(w, http.MethodGet)
 			return
 		}
 		handleDailySync(w, r, deps)
 	})
 }
 
-// Handles the nightly cron job: (Plaid/Snaptrade Syncs + Status Checks).
+// Handles the nightly cron job: (Plaid Syncs + Status Checks).
 func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencies) {
 	w.Header().Set("Content-Type", "application/json")
 
