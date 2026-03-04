@@ -89,7 +89,7 @@ func HandlePlaidWebhook(w http.ResponseWriter, r *http.Request, deps apiDependen
 // Runs cursor-based sync and upserts or removes from DB.
 func SyncTransactionsForItem(ctx context.Context, db *database.Client, plaidClient *plaid.Client, item *database.PlaidItem) error {
 	// Returns if missing dependencies.
-	if plaidClient == nil || db == nil {
+	if plaidClient == nil || db == nil || item.AccessToken == "manual" {
 		return nil
 	}
 	cursor := ""

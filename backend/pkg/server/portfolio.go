@@ -136,30 +136,30 @@ func handleGetHoldings(w http.ResponseWriter, r *http.Request, deps apiDependenc
 		accountNameMap[a.AccountID] = a.Name
 	}
 
-	// Fetch the latest date available in the daily_holdings table.
-	latestDate, err := deps.db.GetLatestDailyHoldingsDate(r.Context())
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "failed to get latest holdings date: "+err.Error())
-		return
-	}
-
+	// Loop through all accounts and fetch the latest holdings for each account.
 	var holdings []HoldingJSON
-	if latestDate != nil {
-		// Fetch all holdings for that specific latest date.
-		plaidHoldings, err := deps.db.ListDailyHoldings(r.Context(), *latestDate, *latestDate)
+	for _, acc := range plaidAccounts {
+		latestDate, err := deps.db.GetLatestDailyHoldingsDateForAccount(r.Context(), acc.AccountID)
+		if err != nil || latestDate == nil {
+			continue
+		}
+		accountHoldings, err := deps.db.ListDailyHoldingsByAccount(r.Context(), acc.AccountID, *latestDate, *latestDate)
 		if err != nil {
-			writeJSONError(w, http.StatusInternalServerError, "failed to list latest daily holdings: "+err.Error())
-			return
+			continue
 		}
 
-		for _, h := range plaidHoldings {
+		// Loop through all holdings for the current account and add them to the response.
+		for _, holding := range accountHoldings {
+			if holding.Quantity == 0 {
+				continue
+			}
 			holdings = append(holdings, HoldingJSON{
-				AccountID:      h.AccountID,
-				AccountName:    accountNameMap[h.AccountID],
-				Symbol:         h.Symbol,
-				Quantity:       h.Quantity,
-				ValueCents:     h.ValueCents,
-				CostBasisCents: h.CostBasisCents,
+				AccountID:      holding.AccountID,
+				AccountName:    accountNameMap[holding.AccountID],
+				Symbol:         holding.Symbol,
+				Quantity:       holding.Quantity,
+				ValueCents:     holding.ValueCents,
+				CostBasisCents: holding.CostBasisCents,
 			})
 		}
 	}
@@ -250,8 +250,8 @@ func handleGetSnapshots(w http.ResponseWriter, r *http.Request, deps apiDependen
 
 	// Get necessary dates and parameters.
 	accountID := r.URL.Query().Get("accountId")
-	now := time.Now().UTC()
-	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	now := GetLocalNow()
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, GetLocalLocation())
 	dailyStart := dayStart.AddDate(0, 0, -30)
 
 	// List the daily snapshots.
@@ -281,33 +281,87 @@ func handleGetSnapshots(w http.ResponseWriter, r *http.Request, deps apiDependen
 		}
 	} else {
 		// List the total monthly snapshots across all accounts and aggregate them.
-		allMonthly, err := deps.db.ListMonthlySnapshots(r.Context(), monthlyStart, dayStart)
+		allMonthlySnapshots, err := deps.db.ListMonthlySnapshots(r.Context(), monthlyStart, dayStart)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "failed to list monthly snapshots: "+err.Error())
 			return
 		}
-		sumByMonth := make(map[string]int64)
-		for _, snapshot := range allMonthly {
+		monthlySum := make(map[string]int64)
+		for _, snapshot := range allMonthlySnapshots {
 			month := snapshot.Month.Format(dateLayout)
-			sumByMonth[month] += snapshot.PortfolioValueCents
+			monthlySum[month] += snapshot.PortfolioValueCents
 		}
-		for month, sum := range sumByMonth {
+		for month, sum := range monthlySum {
 			monthlyPoints = append(monthlyPoints, SnapshotDataPoint{
 				Date:                month,
 				PortfolioValueCents: sum,
 			})
 		}
-		sortSnapshotDataPoints(monthlyPoints)
+	}
+	// Convert the daily snapshots into data points.
+	dailyPoints := make([]SnapshotDataPoint, 0)
+	if accountID != "" {
+		// Get the daily holdings for each account.
+		recentHoldings, _ := deps.db.ListDailyHoldingsByAccount(r.Context(), accountID, dailyStart, dayStart)
+		holdingsByDate := make(map[string]int64)
+		for _, holding := range recentHoldings {
+			dateStr := holding.Date.Format(dateLayout)
+			holdingsByDate[dateStr] += holding.ValueCents
+		}
+
+		// Collect only the dates we have data for.
+		for d := dailyStart; !d.After(dayStart); d = d.AddDate(0, 0, 1) {
+			dateStr := d.Format(dateLayout)
+			if val, ok := holdingsByDate[dateStr]; ok {
+				dailyPoints = append(dailyPoints, SnapshotDataPoint{
+					Date:                dateStr,
+					PortfolioValueCents: val,
+				})
+			}
+		}
+	} else {
+		// Calculate the total daily snapshots across all accounts and aggregate them.
+		snapshotMap := make(map[string]int64)
+		for _, snapshot := range dailySnapshots {
+			snapshotMap[snapshot.Date.Format(dateLayout)] = snapshot.PortfolioValueCents
+		}
+
+		var lastValue int64
+		for d := dailyStart; !d.After(dayStart); d = d.AddDate(0, 0, 1) {
+			dateStr := d.Format(dateLayout)
+			if val, ok := snapshotMap[dateStr]; ok {
+				lastValue = val
+			}
+			// Only add the data point if the last value is greater than 0.
+			if lastValue > 0 {
+				dailyPoints = append(dailyPoints, SnapshotDataPoint{
+					Date:                dateStr,
+					PortfolioValueCents: lastValue,
+				})
+			}
+		}
 	}
 
-	// Convert the daily snapshots to the data points.
-	dailyPoints := make([]SnapshotDataPoint, 0, len(dailySnapshots))
-	for _, snapshot := range dailySnapshots {
-		dailyPoints = append(dailyPoints, SnapshotDataPoint{
-			Date:                snapshot.Date.Format(dateLayout),
-			PortfolioValueCents: snapshot.PortfolioValueCents,
+	// Include the current month in the monthly chart even if it hasn't ended yet.
+	currentMonthKey := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, GetLocalLocation()).Format(dateLayout)
+	hasCurrentMonth := false
+	for _, monthPoint := range monthlyPoints {
+		if monthPoint.Date == currentMonthKey {
+			hasCurrentMonth = true
+			break
+		}
+	}
+
+	// Use the absolute latest daily point as the current month's "live" value.
+	if !hasCurrentMonth && len(dailyPoints) > 0 {
+		latestPoint := dailyPoints[len(dailyPoints)-1]
+		monthlyPoints = append(monthlyPoints, SnapshotDataPoint{
+			Date:                currentMonthKey,
+			PortfolioValueCents: latestPoint.PortfolioValueCents,
 		})
 	}
+
+	sortSnapshotDataPoints(monthlyPoints)
 
 	resp := SnapshotsResponse{
 		Daily:   dailyPoints,
@@ -341,8 +395,8 @@ func handleGetHoldingsHistory(w http.ResponseWriter, r *http.Request, deps apiDe
 	accountID := r.URL.Query().Get("accountId")
 	symbol := r.URL.Query().Get("symbol")
 
-	now := time.Now().UTC()
-	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	now := GetLocalNow()
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, GetLocalLocation())
 	dailyStart := dayStart.AddDate(0, 0, -30)
 
 	var dailyHoldings []database.DailyHolding
@@ -361,20 +415,41 @@ func handleGetHoldingsHistory(w http.ResponseWriter, r *http.Request, deps apiDe
 		return
 	}
 
+	// Fetch Plaid accounts to get account names.
+	plaidAccounts, _ := deps.db.ListPlaidAccounts(r.Context())
 	accountMap := make(map[string]string)
-
-	// Convert the daily holdings to the data points.
-	dailyPoints := make([]HoldingDataPoint, 0, len(dailyHoldings))
+	for _, account := range plaidAccounts {
+		accountMap[account.AccountID] = account.Name
+	}
+	// Group holdings by date for easier iteration.
+	holdingsByDate := make(map[string][]database.DailyHolding)
 	for _, holding := range dailyHoldings {
-		dailyPoints = append(dailyPoints, HoldingDataPoint{
-			Date:           holding.Date.Format(dateLayout),
-			AccountID:      holding.AccountID,
-			AccountName:    accountMap[holding.AccountID],
-			Symbol:         holding.Symbol,
-			Quantity:       holding.Quantity,
-			ValueCents:     holding.ValueCents,
-			CostBasisCents: holding.CostBasisCents,
-		})
+		dateStr := holding.Date.Format(dateLayout)
+		holdingsByDate[dateStr] = append(holdingsByDate[dateStr], holding)
+	}
+
+	dailyPoints := make([]HoldingDataPoint, 0)
+
+	// Iterate through the daily holdings and add them to the daily points.
+	for d := dailyStart; !d.After(dayStart); d = d.AddDate(0, 0, 1) {
+		dateStr := d.Format(dateLayout)
+
+		if newHoldings, ok := holdingsByDate[dateStr]; ok {
+			for _, nh := range newHoldings {
+				if nh.Quantity == 0 {
+					continue
+				}
+				dailyPoints = append(dailyPoints, HoldingDataPoint{
+					Date:           dateStr,
+					AccountID:      nh.AccountID,
+					AccountName:    accountMap[nh.AccountID],
+					Symbol:         nh.Symbol,
+					Quantity:       nh.Quantity,
+					ValueCents:     nh.ValueCents,
+					CostBasisCents: nh.CostBasisCents,
+				})
+			}
+		}
 	}
 
 	resp := HoldingsHistoryResponse{

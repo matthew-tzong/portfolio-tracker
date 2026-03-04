@@ -168,6 +168,7 @@ export function Dashboard() {
                 value: s.netWorthCents / 100,
               }))}
               height={300}
+              isMonthly={true}
             />
           </div>
         )}

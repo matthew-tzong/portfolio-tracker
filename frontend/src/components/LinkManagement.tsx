@@ -26,6 +26,7 @@ interface SnaptradeConnection {
 interface LinksResponse {
   plaidItems: PlaidItem[]
   // snaptradeConnections?: SnaptradeConnection[]
+  fidelityItems: PlaidItem[]
 }
 
 // Returns the link management page.
@@ -213,7 +214,7 @@ export function LinkManagement() {
                 </p>
               </div>
             ) : (
-              <div className="bg-zinc-900 border border-border rounded-4xl overflow-hidden shadow-2xl">
+              <div className="bg-zinc-900 border border-border rounded-4xl overflow-hidden shadow-2xl mb-12">
                 <table className="min-w-full text-sm">
                   <thead>
                     <tr className="bg-zinc-800/50 border-b border-border">
@@ -248,8 +249,8 @@ export function LinkManagement() {
                         <td className="px-6 py-4">
                           <span
                             className={`px-3 py-1 rounded-full text-[10px] font-bold border ${item.status === 'OK'
-                                ? 'bg-primary/10 text-primary border-primary/20'
-                                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                              ? 'bg-primary/10 text-primary border-primary/20'
+                              : 'bg-red-500/10 text-red-400 border-red-500/20'
                               }`}
                           >
                             {item.status === 'OK' ? 'CONNECTED' : item.status}
@@ -281,6 +282,59 @@ export function LinkManagement() {
                               Disconnect
                             </button>
                           </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section>
+            <div className="flex items-center gap-3 mb-6">
+              <h2 className="text-xl font-bold text-white">Manual Connections</h2>
+              <span className="bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-md text-[10px] font-bold border border-border">
+                {data.fidelityItems.length} ACTIVE
+              </span>
+            </div>
+
+            {data.fidelityItems.length === 0 ? (
+              <div className="p-12 text-center border border-dashed border-border rounded-4xl">
+                <p className="text-zinc-600 font-medium italic">
+                  No manual Fidelity connections yet. Upload a CSV in the Portfolio view.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-zinc-900 border border-border rounded-4xl overflow-hidden shadow-2xl">
+                <table className="min-w-full text-sm">
+                  <tbody className="divide-y divide-border">
+                    {data.fidelityItems.map((item) => (
+                      <tr key={item.itemId} className="hover:bg-zinc-800/30 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-white">
+                            {item.institutionName}
+                          </div>
+                          <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter mt-0.5">
+                            MANUAL TRACKING
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="px-3 py-1 rounded-full text-[10px] font-bold border bg-primary/10 text-primary border-primary/20">
+                            CONNECTED
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-zinc-400 font-medium">
+                          Last uploaded: {new Date(item.lastUpdated).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => removePlaidItem(item.itemId)}
+                            className="px-4 py-1.5 bg-zinc-800 text-zinc-400 text-[11px] font-bold rounded-full border border-border hover:bg-red-500 hover:text-white hover:border-red-500 transition-all active:scale-95"
+                          >
+                            Reset
+                          </button>
                         </td>
                       </tr>
                     ))}

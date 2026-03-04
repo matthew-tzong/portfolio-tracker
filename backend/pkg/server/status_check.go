@@ -27,6 +27,9 @@ func checkAndUpdatePlaidItemStatuses(ctx context.Context, db *database.Client, p
 
 	// Check status of each item
 	for i := range items {
+		if items[i].AccessToken == "manual" {
+			continue
+		}
 		itemStatus, err := plaidClient.GetItem(ctx, items[i].AccessToken)
 		if err != nil {
 			// Check if this is an authentication error (needs reconnection)

@@ -19,6 +19,7 @@ interface TimeSeriesChartProps {
   title: string
   data: TimeSeriesPoint[]
   height?: number
+  isMonthly?: boolean
 }
 
 // Formats a number as a currency string.
@@ -31,13 +32,28 @@ function formatCurrency(value: number): string {
 }
 
 // Formats a date string.
-function formatDateLabel(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+function formatDateLabel(dateStr: string, isMonthly?: boolean): string {
+  // Get date from YYYY-MM-DD string.
+  const [year, month, day] = dateStr.split('-').map(Number)
+  const date = new Date(year, month - 1, day)
+
+  // If monthly, format as "Month Year".
+  if (isMonthly) {
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric'
+    })
+  }
+
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
+  })
 }
 
 // Returns the time series chart.
-export function TimeSeriesChart({ title, data, height = 300 }: TimeSeriesChartProps) {
+export function TimeSeriesChart({ title, data, height = 300, isMonthly }: TimeSeriesChartProps) {
   if (!data.length) {
     return (
       <div
@@ -68,7 +84,7 @@ export function TimeSeriesChart({ title, data, height = 300 }: TimeSeriesChartPr
             <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
             <XAxis
               dataKey="date"
-              tickFormatter={formatDateLabel}
+              tickFormatter={(label) => formatDateLabel(String(label), isMonthly)}
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 10, fill: '#71717a', fontWeight: 'bold' }}
@@ -92,7 +108,7 @@ export function TimeSeriesChart({ title, data, height = 300 }: TimeSeriesChartPr
               formatter={(value: unknown) =>
                 typeof value === 'number' ? formatCurrency(value) : String(value)
               }
-              labelFormatter={(label) => formatDateLabel(String(label))}
+              labelFormatter={(label) => formatDateLabel(String(label), isMonthly)}
             />
             <Line
               type="monotone"

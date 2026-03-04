@@ -12,6 +12,21 @@ import (
 	// "github.com/matthewtzong/portfolio-tracker/backend/pkg/snaptrade"
 )
 
+// Returns the local timezone (EST).
+func GetLocalLocation() *time.Location {
+	loc, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		// Fallback to a fixed offset if loading fails
+		return time.FixedZone("EST", -5*60*60)
+	}
+	return loc
+}
+
+// Returns the current time in the local timezone (EST).
+func GetLocalNow() time.Time {
+	return time.Now().In(GetLocalLocation())
+}
+
 // Configures and starts the HTTP server with CORS support and protected routes.
 func Run() error {
 	handler, err := NewHandler()
@@ -90,6 +105,7 @@ func NewHandler() (http.Handler, error) {
 	registerPortfolioRoutes(mux, deps)
 	registerCronRoutes(mux, deps)
 	registerExportRoutes(mux, deps)
+	registerFidelityRoutes(mux, deps)
 
 	return withCORS(mux), nil
 }

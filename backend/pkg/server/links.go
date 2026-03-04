@@ -53,7 +53,8 @@ type exchangeTokenResponse struct {
 
 // List links response format.
 type linksResponse struct {
-	PlaidItems []database.PlaidItemJSON `json:"plaidItems"`
+	PlaidItems    []database.PlaidItemJSON `json:"plaidItems"`
+	FidelityItems []database.PlaidItemJSON `json:"fidelityItems"`
 	// SnaptradeConnections []database.SnaptradeConnectionJSON `json:"snaptradeConnections"`
 }
 
@@ -292,12 +293,16 @@ func handleListLinks(w http.ResponseWriter, r *http.Request, deps apiDependencie
 	// 	return
 	// }
 
-	// Convert to JSON-safe representations.
+	// Convert to JSON-safe representations and split out manual items.
 	plaidJSON := []database.PlaidItemJSON{}
+	fidelityJSON := []database.PlaidItemJSON{}
 	for _, item := range plaidItems {
-		plaidJSON = append(plaidJSON, item.ToJSON())
+		if item.ItemID == "fidelity_manual_item" {
+			fidelityJSON = append(fidelityJSON, item.ToJSON())
+		} else {
+			plaidJSON = append(plaidJSON, item.ToJSON())
+		}
 	}
-
 	// snapJSON := []database.SnaptradeConnectionJSON{}
 	// for _, conn := range snapConns {
 	// 	snapJSON = append(snapJSON, conn.ToJSON())
@@ -306,6 +311,7 @@ func handleListLinks(w http.ResponseWriter, r *http.Request, deps apiDependencie
 	resp := linksResponse{
 		PlaidItems: plaidJSON,
 		// SnaptradeConnections: snapJSON,
+		FidelityItems: fidelityJSON,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
@@ -338,7 +344,7 @@ func handleRemovePlaidItem(w http.ResponseWriter, r *http.Request, deps apiDepen
 	}
 
 	// Remove the item from Plaid.
-	if deps.plaidClient != nil {
+	if deps.plaidClient != nil && item.AccessToken != "manual" {
 		if err := deps.plaidClient.RemoveItem(r.Context(), item.AccessToken); err != nil {
 			writeJSONError(w, http.StatusBadGateway, "failed to remove Plaid item: "+err.Error())
 			return

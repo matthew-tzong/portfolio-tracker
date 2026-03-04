@@ -105,6 +105,9 @@ func runPlaidSafetySync(r *http.Request, deps apiDependencies) (int, error) {
 
 	// Syncs the transactions for each item.
 	for _, item := range items {
+		if item.AccessToken == "manual" {
+			continue
+		}
 		err = SyncTransactionsForItem(r.Context(), deps.db, deps.plaidClient, &item)
 		if err != nil {
 			return 0, err
@@ -127,15 +130,13 @@ func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bo
 	}
 
 	// Sets the current time as the snapshot date.
-	now := time.Now().UTC()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
-
-	var (
-		totalPortfolioCents int64
-		accountTotals       = make(map[string]int64)
-	)
+	now := GetLocalNow()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, GetLocalLocation())
 
 	for _, item := range items {
+		if item.AccessToken == "manual" {
+			continue
+		}
 		// Fetch accounts for this item to identify investment accounts.
 		accounts, err := deps.plaidClient.GetAccounts(r.Context(), item.AccessToken)
 		if err != nil {
@@ -147,9 +148,6 @@ func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bo
 		for _, acc := range accounts {
 			if acc.Type == "investment" {
 				investmentAccountIDs[acc.AccountID] = true
-				cents := int64(math.Round(acc.Balances.Current * 100))
-				totalPortfolioCents += cents
-				accountTotals[acc.AccountID] = cents
 			}
 		}
 
@@ -203,29 +201,13 @@ func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bo
 		}
 	}
 
-	// Writes today's total portfolio snapshot.
-	snapshot := &database.DailySnapshot{
-		Date:                database.DateOnly{Time: today},
-		PortfolioValueCents: totalPortfolioCents,
-	}
-	err = deps.db.UpsertDailySnapshot(r.Context(), snapshot)
+	// Update snapshots (daily and monthly) for today.
+	err = updatePortfolioSnapshots(r, deps, today)
 	if err != nil {
 		return false, 0, err
 	}
 
-	// Writes the monthly snapshots.
-	monthlyWritten, err := maybeWriteMonthlySnapshots(r, deps, today, accountTotals)
-	if err != nil {
-		return true, 0, err
-	}
-
-	// Writes the monthly net worth snapshot.
-	err = maybeWriteMonthlyNetWorth(r, deps, today, totalPortfolioCents)
-	if err != nil {
-		return true, monthlyWritten, err
-	}
-
-	return true, monthlyWritten, nil
+	return true, 1, nil // 1 monthly snapshot potentially written
 }
 
 /*
@@ -310,65 +292,51 @@ func writeSnaptradeSnapshotsForToday(r *http.Request, deps apiDependencies) (boo
 }
 */
 
-// If today is the end of the month, write per-account monthly snapshots using today's values.
-func maybeWriteMonthlySnapshots(r *http.Request, deps apiDependencies, today time.Time, accountTotals map[string]int64) (int, error) {
-	// Checks if today is the last calendar day of the month.
-	tomorrow := today.AddDate(0, 0, 1)
-	if tomorrow.Month() == today.Month() {
-		return 0, nil
-	}
-
-	if deps.db == nil {
-		return 0, nil
-	}
-
-	monthStart := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC)
-	written := 0
-
-	// Loops through the accounts and writes the monthly snapshots.
-	for accountID, total := range accountTotals {
-		snapshot := &database.MonthlySnapshot{
-			Month:               database.DateOnly{Time: monthStart},
-			AccountID:           accountID,
-			PortfolioValueCents: total,
-		}
-		err := deps.db.UpsertMonthlySnapshot(r.Context(), snapshot)
-		if err != nil {
-			return written, err
-		}
-		written++
-	}
-
-	return written, nil
-}
-
 // If today is the end of the month, write a single overall monthly net worth snapshot.
-func maybeWriteMonthlyNetWorth(r *http.Request, deps apiDependencies, today time.Time, investmentsCents int64) error {
-	// Checks if today is the last calendar day of the month.
-	tomorrow := today.AddDate(0, 0, 1)
-	if tomorrow.Month() == today.Month() {
+func maybeWriteMonthlyNetWorth(r *http.Request, deps apiDependencies, date time.Time, _ int64) error {
+	// Check if today is the last calendar day of the month.
+	year, month, _ := date.Date()
+	nextDay := date.AddDate(0, 0, 1)
+	if nextDay.Month() == date.Month() {
 		return nil
 	}
+
 	if deps.db == nil {
 		return nil
 	}
 
-	// Gets the cash and liabilities from the Plaid accounts.
-	var cashCents, liabilitiesCents int64
+	// Fetch all accounts to sum up cash, investments, and liabilities.
 	plaidAccounts, err := deps.db.ListPlaidAccounts(r.Context())
-	if err == nil {
-		for _, account := range plaidAccounts {
-			_, cashDelta, _, liabilityDelta := loadPlaidAccounts(account)
-			cashCents += cashDelta
-			liabilitiesCents += liabilityDelta
+	if err != nil {
+		return err
+	}
+
+	var cashCents, investmentsCents, liabilitiesCents int64
+	var foundAny bool
+
+	// Loop through all accounts and sum up cash, investments, and liabilities.
+	for _, account := range plaidAccounts {
+		if account.CreatedAt != nil && account.CreatedAt.After(time.Date(year, month+1, 0, 23, 59, 59, 0, time.UTC)) {
+			continue
 		}
+
+		foundAny = true
+		_, cashDelta, investDelta, liabilityDelta := loadPlaidAccounts(account)
+		cashCents += cashDelta
+		investmentsCents += investDelta
+		liabilitiesCents += liabilityDelta
+	}
+
+	// Skip if no accounts were active as of this date.
+	if !foundAny {
+		log.Printf("cron: skipping monthly net worth for %s - no active accounts found", date.Format("2006-01-02"))
+		return nil
 	}
 
 	netWorthCents := cashCents + investmentsCents - liabilitiesCents
-	monthStart := time.Date(today.Year(), today.Month(), 1, 0, 0, 0, 0, time.UTC)
 
 	snapshot := &database.MonthlyNetWorth{
-		Month:            database.DateOnly{Time: monthStart},
+		Month:            database.DateOnly{Time: date},
 		NetWorthCents:    netWorthCents,
 		CashCents:        cashCents,
 		InvestmentsCents: investmentsCents,
@@ -383,8 +351,8 @@ func runRetentionJob(ctx context.Context, deps apiDependencies) error {
 		return nil
 	}
 
-	now := time.Now().UTC()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	now := GetLocalNow()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, GetLocalLocation())
 	userEmail := os.Getenv("ALLOWED_USER_EMAIL")
 
 	// Prunes 1 year old transactions on the first day of each month.
@@ -458,8 +426,18 @@ func runRetentionJob(ctx context.Context, deps apiDependencies) error {
 		return nil
 	}
 
+	// Fetch all Plaid accounts to map IDs to names.
+	accounts, err := deps.db.ListPlaidAccounts(ctx)
+	if err != nil {
+		log.Printf("retention: failed to fetch accounts for yearly CSV: %v", err)
+	}
+	accountMap := make(map[string]string)
+	for _, account := range accounts {
+		accountMap[account.AccountID] = account.Name
+	}
+
 	// Builds the CSV for the yearly monthly snapshots.
-	csvBytes, err := BuildPortfolioSnapshotsCSV(snapshots)
+	csvBytes, err := BuildPortfolioSnapshotsCSV(snapshots, accountMap)
 	if err != nil {
 		log.Printf("retention: build portfolio CSV for year %d: %v", lastYear, err)
 		return err
@@ -572,6 +550,5 @@ func createYearlyExpenseSummaries(ctx context.Context, deps apiDependencies, yea
 			_ = deps.db.UpsertYearlyPortfolioSummary(ctx, yearlyPortfolio)
 		}
 	}
-
 	return nil
 }

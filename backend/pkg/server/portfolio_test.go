@@ -9,6 +9,7 @@ import (
 	"github.com/matthewtzong/portfolio-tracker/backend/pkg/database"
 )
 
+// Test that the snapshot data points are sorted by date.
 func TestSortSnapshotDataPointsOrdersByDate(t *testing.T) {
 	points := []SnapshotDataPoint{
 		{Date: "2024-03-01", PortfolioValueCents: 200},
@@ -23,6 +24,7 @@ func TestSortSnapshotDataPointsOrdersByDate(t *testing.T) {
 	}
 }
 
+// Test that the monthly snapshots are aggregated by month.
 func TestAggregateMonthlySnapshotsSumsByMonth(t *testing.T) {
 	month1 := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	month2 := time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC)
@@ -75,7 +77,8 @@ func TestBuildPortfolioSnapshotsCSVIncludesHeadersAndRows(t *testing.T) {
 		{Month: database.DateOnly{Time: month1}, AccountID: "acc-1", PortfolioValueCents: 12345},
 	}
 
-	data, err := BuildPortfolioSnapshotsCSV(snapshots)
+	accountMap := make(map[string]string)
+	data, err := BuildPortfolioSnapshotsCSV(snapshots, accountMap)
 	if err != nil {
 		t.Fatalf("BuildPortfolioSnapshotsCSV returned error: %v", err)
 	}

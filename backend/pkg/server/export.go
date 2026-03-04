@@ -91,8 +91,19 @@ func handleExportPortfolioSnapshots(w http.ResponseWriter, r *http.Request, deps
 		return
 	}
 
+	// Fetch all Plaid accounts to map IDs to names.
+	accounts, err := deps.db.ListPlaidAccounts(r.Context())
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to fetch accounts: "+err.Error())
+		return
+	}
+	accountMap := make(map[string]string)
+	for _, acc := range accounts {
+		accountMap[acc.AccountID] = acc.Name
+	}
+
 	// Builds the CSV for the monthly snapshots.
-	csvBytes, err := BuildPortfolioSnapshotsCSV(snapshots)
+	csvBytes, err := BuildPortfolioSnapshotsCSV(snapshots, accountMap)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "failed to export snapshots: "+err.Error())
 		return
@@ -127,13 +138,25 @@ func handleExportPortfolioHoldings(w http.ResponseWriter, r *http.Request, deps 
 		return
 	}
 
+	// Fetch all Plaid accounts to map IDs to names.
+	allAccounts, err := deps.db.ListPlaidAccounts(r.Context())
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "failed to fetch accounts: "+err.Error())
+		return
+	}
+	
+	accountMap := make(map[string]string)
+	for _, acc := range allAccounts {
+		accountMap[acc.AccountID] = acc.Name
+	}
+
 	// Set CSV headers and write CSV.
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=portfolio-holdings-%s.csv", month))
 	w.Header().Set("Cache-Control", "no-cache")
 	writer := csv.NewWriter(w)
 	defer writer.Flush()
-	csvHeaders := []string{"Date", "Account ID", "Symbol", "Quantity", "Value ($)"}
+	csvHeaders := []string{"Date", "Account", "Symbol", "Quantity", "Value ($)"}
 	err = writer.Write(csvHeaders)
 	if err != nil {
 		return
@@ -142,9 +165,14 @@ func handleExportPortfolioHoldings(w http.ResponseWriter, r *http.Request, deps 
 	// Writes the rows.
 	for _, holding := range holdings {
 		portfolioValueDollars := float64(holding.ValueCents) / 100.0
+		displayName := holding.AccountID
+		if name, ok := accountMap[holding.AccountID]; ok {
+			displayName = name
+		}
+
 		row := []string{
 			holding.Date.Format("2006-01-02"),
-			holding.AccountID,
+			displayName,
 			holding.Symbol,
 			strconv.FormatFloat(holding.Quantity, 'f', 8, 64),
 			strconv.FormatFloat(portfolioValueDollars, 'f', 2, 64),

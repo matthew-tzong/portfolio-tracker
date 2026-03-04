@@ -76,20 +76,25 @@ func BuildTransactionsCSV(ctx context.Context, db *database.Client, month time.T
 }
 
 // Builds CSV for the given year's monthly snapshots.
-func BuildPortfolioSnapshotsCSV(snapshots []database.MonthlySnapshot) ([]byte, error) {
+func BuildPortfolioSnapshotsCSV(snapshots []database.MonthlySnapshot, accountMap map[string]string) ([]byte, error) {
 	// Creates a new CSV writer.
 	var buffer bytes.Buffer
 	writer := csv.NewWriter(&buffer)
-	csvHeaders := []string{"Month", "Account ID", "Portfolio Value ($)"}
+	csvHeaders := []string{"Month", "Account", "Portfolio Value ($)"}
 	err := writer.Write(csvHeaders)
 	if err != nil {
 		return nil, err
 	}
 	// Writes the rows
 	for _, snapshot := range snapshots {
+		displayName := snapshot.AccountID
+		if name, ok := accountMap[snapshot.AccountID]; ok {
+			displayName = name
+		}
+
 		row := []string{
 			snapshot.Month.Format("2006-01"),
-			snapshot.AccountID,
+			displayName,
 			strconv.FormatFloat(float64(snapshot.PortfolioValueCents)/100.0, 'f', 2, 64),
 		}
 		err = writer.Write(row)
