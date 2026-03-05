@@ -1,4 +1,4 @@
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip, Legend } from 'recharts'
 
 // Category data point.
 interface CategoryDatum {
@@ -49,14 +49,16 @@ export function CategoryPieChart({ title, data, height = 260 }: CategoryPieChart
               cx="50%"
               cy="50%"
               outerRadius="80%"
-              paddingAngle={2}
+              paddingAngle={0}
+              label={({ name, percent }) => `${name} (${((percent || 0) * 100).toFixed(0)}%)`}
+              labelLine={{ stroke: '#52525b', strokeWidth: 1 }}
             >
               {nonZeroData.map((entry, index) => (
                 <Cell
                   key={entry.name}
                   fill={COLORS[index % COLORS.length]}
-                  stroke="#18181b"
-                  strokeWidth={2}
+                  stroke="none"
+                  strokeWidth={0}
                 />
               ))}
             </Pie>
@@ -68,11 +70,17 @@ export function CategoryPieChart({ title, data, height = 260 }: CategoryPieChart
                 fontSize: '12px',
                 color: '#fff',
               }}
+              itemStyle={{ color: '#fff' }}
               formatter={(value: unknown, name: unknown) =>
                 typeof value === 'number'
                   ? [formatCurrency(value), String(name)]
                   : [String(value), String(name)]
               }
+            />
+            <Legend
+              verticalAlign="bottom"
+              height={36}
+              formatter={(value) => <span style={{ color: '#d4d4d8', fontSize: '12px', fontWeight: 'bold' }}>{value}</span>}
             />
           </PieChart>
         </ResponsiveContainer>

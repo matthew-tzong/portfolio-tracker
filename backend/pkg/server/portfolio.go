@@ -150,9 +150,6 @@ func handleGetHoldings(w http.ResponseWriter, r *http.Request, deps apiDependenc
 
 		// Loop through all holdings for the current account and add them to the response.
 		for _, holding := range accountHoldings {
-			if holding.Quantity == 0 {
-				continue
-			}
 			holdings = append(holdings, HoldingJSON{
 				AccountID:      holding.AccountID,
 				AccountName:    accountNameMap[holding.AccountID],

@@ -365,7 +365,7 @@ export function BudgetTracker() {
                                 <span className="text-zinc-600 font-bold">—</span>
                               ) : (
                                 <span
-                                  className={`font-bold ${overBudget ? 'text-red-500' : 'text-zinc-100'}`}
+                                  className={`font-bold ${overBudget ? 'text-red-500 text-lg' : 'text-red-400/80'}`}
                                 >
                                   {formatCurrency(spentCents)}
                                 </span>
@@ -378,9 +378,8 @@ export function BudgetTracker() {
                                 </span>
                               ) : (
                                 <span
-                                  className={`font-bold ${
-                                    remainingCents < 0 ? 'text-red-500' : 'text-primary'
-                                  }`}
+                                  className={`font-bold ${remainingCents < 0 ? 'text-red-500' : 'text-primary'
+                                    }`}
                                 >
                                   {formatCurrency(remainingCents)}
                                 </span>
@@ -414,7 +413,7 @@ export function BudgetTracker() {
                   <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest">
                     Spent in {month}
                   </span>
-                  <span className="text-zinc-100 font-bold">
+                  <span className="text-red-500 font-bold">
                     {formatCurrency(
                       Object.values(spent).reduce(
                         (sum, value) => sum + (typeof value === 'number' ? value : 0),
@@ -428,16 +427,20 @@ export function BudgetTracker() {
                 <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-1 block text-right">
                   Total Remaining
                 </span>
-                <p className="text-3xl font-bold text-primary text-right tracking-tight">
+                <p className={`text-3xl font-bold text-right tracking-tight ${(Object.values(allocations).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0) -
+                    Object.values(spent).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0)) >= 0
+                    ? 'text-primary'
+                    : 'text-red-500'
+                  }`}>
                   {formatCurrency(
                     Object.values(allocations).reduce(
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
                     ) -
-                      Object.values(spent).reduce(
-                        (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                        0,
-                      ),
+                    Object.values(spent).reduce(
+                      (sum, value) => sum + (typeof value === 'number' ? value : 0),
+                      0,
+                    ),
                   )}
                 </p>
               </div>

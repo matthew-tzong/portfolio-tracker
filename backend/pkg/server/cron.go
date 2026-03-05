@@ -144,10 +144,30 @@ func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bo
 		}
 
 		investmentAccountIDs := make(map[string]bool)
+		var dbAccounts []database.PlaidAccount
 		for _, acc := range accounts {
 			if acc.Type == "investment" {
 				investmentAccountIDs[acc.AccountID] = true
 			}
+			account := database.PlaidAccount{
+				PlaidItemID:    item.ItemID,
+				AccountID:      acc.AccountID,
+				Name:           acc.Name,
+				Type:           acc.Type,
+				CurrentBalance: acc.Balances.Current,
+			}
+			if acc.Mask != "" {
+				account.Mask = &acc.Mask
+			}
+			if acc.Subtype != "" {
+				account.Subtype = &acc.Subtype
+			}
+			dbAccounts = append(dbAccounts, account)
+		}
+
+		err = deps.db.UpsertPlaidAccounts(r.Context(), dbAccounts)
+		if err != nil {
+			log.Printf("cron: failed to upsert plaid accounts for item %s: %v", item.ItemID, err)
 		}
 
 		if len(investmentAccountIDs) == 0 {

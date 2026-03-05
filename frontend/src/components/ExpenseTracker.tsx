@@ -216,7 +216,7 @@ export function ExpenseTracker() {
       if (categoryName === 'Transfer') {
         return
       }
-      const delta = -transaction.amountCents
+      const delta = transaction.amountCents
       totalsByCategory[categoryName] = (totalsByCategory[categoryName] ?? 0) + delta
     })
     return Object.entries(totalsByCategory).map(([name, valueCents]) => ({
@@ -357,7 +357,8 @@ export function ExpenseTracker() {
                   <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2 block">
                     Net Savings
                   </span>
-                  <p className="text-2xl font-bold text-white tracking-tight">
+                  <p className={`text-2xl font-bold tracking-tight ${(summary.incomeCents + summary.expensesCents) >= 0 ? 'text-green-500' : 'text-red-500'
+                    }`}>
                     {formatCurrency(summary.incomeCents + summary.expensesCents)}
                   </p>
                 </div>
@@ -440,9 +441,9 @@ export function ExpenseTracker() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-right font-bold">
-                      <span className={tx.amountCents > 0 ? 'text-green-500' : 'text-red-500'}>
-                        {formatCurrency(tx.amountCents)}
+                    <td className="px-6 py-4 text-right font-bold text-xs">
+                      <span className={tx.amountCents > 0 ? 'text-red-500' : 'text-green-500'}>
+                        {formatCurrency(-tx.amountCents)}
                       </span>
                     </td>
                   </tr>
