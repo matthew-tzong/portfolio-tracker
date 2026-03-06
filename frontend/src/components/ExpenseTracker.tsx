@@ -18,6 +18,7 @@ interface Transaction {
   merchantName?: string
   categoryId?: number
   categoryName?: string
+  accountType?: string
   pending: boolean
 }
 
@@ -221,7 +222,7 @@ export function ExpenseTracker() {
     })
     return Object.entries(totalsByCategory).map(([name, valueCents]) => ({
       name,
-      value: Math.max(valueCents, 0) / 100,
+      value: Math.max(-valueCents, 0) / 100,
     }))
   }, [transactions])
 
@@ -442,9 +443,16 @@ export function ExpenseTracker() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-xs">
-                      <span className={tx.amountCents > 0 ? 'text-red-500' : 'text-green-500'}>
-                        {formatCurrency(-tx.amountCents)}
-                      </span>
+                      {(() => {
+                        const isCredit = tx.accountType === 'credit'
+                        const displayAmount = isCredit ? -tx.amountCents : tx.amountCents
+                        const isNegative = displayAmount < 0
+                        return (
+                          <span className={isNegative ? 'text-red-500' : 'text-green-500'}>
+                            {isNegative ? '-' : '+'}{formatCurrency(Math.abs(displayAmount))}
+                          </span>
+                        )
+                      })()}
                     </td>
                   </tr>
                 ))

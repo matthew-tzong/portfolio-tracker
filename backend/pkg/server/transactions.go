@@ -197,7 +197,9 @@ func pfcPrimaryToPlaidName(primary string) string {
 // Converts a Plaid transaction to our DB model.
 func plaidTransactionToDB(p plaid.PlaidTransaction, plaidNameToCategoryID map[string]int64, uncategorizedID int64, rules []database.CategoryRule) database.Transaction {
 	// Sets up transaction fields.
-	amountCents := int64(math.Round(p.Amount * 100))
+	// We negate the amount because Plaid returns positive for outflow and negative for inflow.
+	// Our system convention is: Inflow = Positive, Outflow = Negative.
+	amountCents := int64(math.Round(-p.Amount * 100))
 	date, _ := time.Parse("2006-01-02", p.Date)
 	var categoryID *int64
 	name := strings.ToLower(p.Name)
@@ -426,11 +428,17 @@ func handleListTransactions(w http.ResponseWriter, r *http.Request, deps apiDepe
 		return
 	}
 
-	// Maps category IDs to names.
+	// Maps category IDs to names and account IDs to types.
 	categories, _ := deps.db.ListCategories(r.Context())
 	categoryNameByID := make(map[int64]string)
 	for _, category := range categories {
 		categoryNameByID[category.ID] = category.Name
+	}
+
+	accounts, _ := deps.db.ListPlaidAccounts(r.Context())
+	accountTypeByID := make(map[string]string)
+	for _, acc := range accounts {
+		accountTypeByID[acc.AccountID] = acc.Type
 	}
 
 	// Converts the transactions to our API model.
@@ -443,6 +451,7 @@ func handleListTransactions(w http.ResponseWriter, r *http.Request, deps apiDepe
 			Name:         transaction.Name,
 			MerchantName: transaction.MerchantName,
 			CategoryID:   transaction.CategoryID,
+			AccountType:  accountTypeByID[transaction.PlaidAccountID],
 			Pending:      transaction.Pending,
 		}
 		if transaction.CategoryID != nil {
@@ -652,6 +661,7 @@ func calculateMonthlySpentByCategory(ctx context.Context, dbClient *database.Cli
 		}
 
 		categoryName := category.Name
+		// We sum the negative amounts (outflows) and will handle display as positive in the UI.
 		monthlySpending[categoryName] += transaction.AmountCents
 	}
 	return monthlySpending, nil
@@ -685,6 +695,7 @@ type transactionJSON struct {
 	MerchantName *string `json:"merchantName,omitempty"`
 	CategoryID   *int64  `json:"categoryId,omitempty"`
 	CategoryName string  `json:"categoryName,omitempty"`
+	AccountType  string  `json:"accountType,omitempty"`
 	Pending      bool    `json:"pending"`
 }
 

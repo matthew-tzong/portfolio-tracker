@@ -81,7 +81,7 @@ export function BudgetTracker() {
       categories.forEach((cat) => {
         if (cat.expense) {
           const val = spentByName[cat.name] ?? 0
-          spentById[String(cat.id)] = Math.max(val, 0)
+          spentById[String(cat.id)] = val
         }
       })
       setSpent(spentById)
@@ -139,7 +139,7 @@ export function BudgetTracker() {
         return {
           name: category.name,
           budget: allocatedCents / 100,
-          spent: spentCents / 100,
+          spent: Math.abs(spentCents) / 100,
         }
       })
   }, [allocations, categories, spent])
@@ -333,7 +333,7 @@ export function BudgetTracker() {
                         const key = String(category.id)
                         const allocatedCents = allocations[key] ?? 0
                         const spentCents = spent[key] ?? 0
-                        const remainingCents = allocatedCents - spentCents
+                        const remainingCents = allocatedCents - Math.abs(spentCents)
 
                         return (
                           <tr
@@ -433,7 +433,7 @@ export function BudgetTracker() {
                     Object.values(allocations).reduce(
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
-                    ) -
+                    ) +
                     Object.values(spent).reduce(
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,

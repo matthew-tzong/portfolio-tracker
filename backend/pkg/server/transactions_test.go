@@ -27,7 +27,7 @@ func TestPlaidTransactionToDB_CategoryRuleTakesPrecedence(t *testing.T) {
 	tx := plaid.PlaidTransaction{
 		AccountID:     "acc-1",
 		TransactionID: "tx-1",
-		Amount:        -25.50,
+		Amount:        25.50,
 		Date:          "2024-01-15",
 		Name:          "Venmo payment to friend",
 		MerchantName:  strPtr("VENMO"),
@@ -58,7 +58,7 @@ func TestPlaidTransactionToDB_FallsBackToPlaidPrimaryOrUncategorized(t *testing.
 	txWithKnownPlaidCategory := plaid.PlaidTransaction{
 		AccountID:     "acc-1",
 		TransactionID: "tx-1",
-		Amount:        -100.00,
+		Amount:        100.00,
 		Date:          "2024-01-01",
 		Name:          "Fidelity purchase",
 		MerchantName:  strPtr("Fidelity"),
@@ -69,7 +69,7 @@ func TestPlaidTransactionToDB_FallsBackToPlaidPrimaryOrUncategorized(t *testing.
 	txWithUnknownPlaidCategory := plaid.PlaidTransaction{
 		AccountID:     "acc-1",
 		TransactionID: "tx-2",
-		Amount:        -10.00,
+		Amount:        10.00,
 		Date:          "2024-01-02",
 		Name:          "Misc",
 		MerchantName:  nil,
@@ -100,7 +100,7 @@ func TestPlaidTransactionToDB_UsesPersonalFinanceCategoryWhenLegacyCategoryEmpty
 	tx := plaid.PlaidTransaction{
 		AccountID:               "acc-1",
 		TransactionID:           "tx-1",
-		Amount:                  -25.00,
+		Amount:                  25.00,
 		Date:                    "2024-01-01",
 		Name:                    "Whole Foods",
 		Category:                nil,
@@ -114,7 +114,7 @@ func TestPlaidTransactionToDB_UsesPersonalFinanceCategoryWhenLegacyCategoryEmpty
 
 	// No category at all -> Uncategorized.
 	txNoCat := plaid.PlaidTransaction{
-		AccountID: "acc-1", TransactionID: "tx-2", Amount: -5, Date: "2024-01-02", Name: "Unknown",
+		AccountID: "acc-1", TransactionID: "tx-2", Amount: 5, Date: "2024-01-02", Name: "Unknown",
 		Category: nil, PersonalFinanceCategory: nil, Pending: false,
 	}
 	resultNoCat := plaidTransactionToDB(txNoCat, plaidNameToCategoryID, categoryUncategorized, rules)
