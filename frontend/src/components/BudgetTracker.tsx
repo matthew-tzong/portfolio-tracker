@@ -231,7 +231,7 @@ export function BudgetTracker() {
       <div className="bg-card border border-border rounded-4xl p-8 shadow-2xl mb-8">
         <div className="flex flex-wrap items-end gap-8 mb-10">
           <div className="flex-1 min-w-[240px]">
-            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1">
+            <label className="block text-sm font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1">
               Analysis Month
             </label>
             <select
@@ -245,12 +245,12 @@ export function BudgetTracker() {
                 </option>
               ))}
             </select>
-            <p className="mt-2 text-[10px] text-zinc-500 font-medium ml-1">
+            <p className="mt-2 text-sm text-zinc-500 font-medium ml-1">
               Budget numbers are global; the month only changes the spent column.
             </p>
           </div>
           <div className="flex-1 min-w-[240px]">
-            <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1">
+            <label className="block text-sm font-bold text-zinc-500 uppercase tracking-widest mb-3 ml-1">
               Total Monthly Allocation
             </label>
             <div className="relative">
@@ -267,7 +267,7 @@ export function BudgetTracker() {
                 className="w-full bg-zinc-900 border border-border text-zinc-100 rounded-2xl pl-9 pr-5 py-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all"
               />
             </div>
-            <p className="mt-2 text-[10px] text-zinc-500 font-medium ml-1">
+            <p className="mt-2 text-sm text-zinc-500 font-medium ml-1">
               Per-category budgets must add up exactly to this total.
             </p>
           </div>
@@ -302,16 +302,16 @@ export function BudgetTracker() {
               <table className="min-w-full text-sm">
                 <thead>
                   <tr className="bg-zinc-800/50 border-b border-border">
-                    <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-xs">
+                    <th className="px-6 py-4 text-left font-bold text-white uppercase tracking-wider text-sm">
                       Category
                     </th>
-                    <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                    <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-sm">
                       Allocated
                     </th>
-                    <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                    <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-sm">
                       Spent
                     </th>
-                    <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-xs">
+                    <th className="px-6 py-4 text-right font-bold text-white uppercase tracking-wider text-sm">
                       Remaining
                     </th>
                   </tr>
@@ -334,17 +334,16 @@ export function BudgetTracker() {
                         const allocatedCents = allocations[key] ?? 0
                         const spentCents = spent[key] ?? 0
                         const remainingCents = allocatedCents - spentCents
-                        const overBudget = allocatedCents > 0 && spentCents > allocatedCents
 
                         return (
                           <tr
                             key={category.id}
                             className="hover:bg-zinc-800/30 transition-colors group"
                           >
-                            <td className="px-6 py-4 font-bold text-white">{category.name}</td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-6 py-4 font-bold text-white text-sm">{category.name}</td>
+                            <td className="px-6 py-4 text-right text-sm">
                               <div className="flex justify-end items-center">
-                                <span className="text-zinc-500 mr-2 text-xs font-bold">$</span>
+                                <span className="text-zinc-500 mr-2 text-sm font-bold">$</span>
                                 <input
                                   type="number"
                                   min={0}
@@ -355,30 +354,28 @@ export function BudgetTracker() {
                                   onChange={(e) =>
                                     handleAllocationChange(category.id, e.target.value)
                                   }
-                                  className="w-24 bg-zinc-800 border border-border text-zinc-100 rounded-lg px-2 py-1 text-right text-xs focus:border-primary focus:outline-none transition-all"
+                                  className="w-24 bg-zinc-800 border border-border text-zinc-100 rounded-lg px-2 py-1 text-right text-sm focus:border-primary focus:outline-none transition-all"
                                   placeholder="0.00"
                                 />
                               </div>
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-6 py-4 text-right text-sm">
                               {spentCents === 0 ? (
                                 <span className="text-zinc-600 font-bold">—</span>
                               ) : (
-                                <span
-                                  className={`font-bold ${overBudget ? 'text-red-500 text-lg' : 'text-red-400/80'}`}
-                                >
+                                <span className="font-bold text-sm text-red-500">
                                   {formatCurrency(spentCents)}
                                 </span>
                               )}
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-6 py-4 text-right text-sm">
                               {allocatedCents === 0 ? (
-                                <span className="text-zinc-600 text-[10px] font-bold uppercase tracking-tighter">
+                                <span className="text-zinc-600 text-sm font-bold uppercase tracking-tighter">
                                   No budget
                                 </span>
                               ) : (
                                 <span
-                                  className={`font-bold ${remainingCents < 0 ? 'text-red-500' : 'text-primary'
+                                  className={`font-bold text-sm ${remainingCents < 0 ? 'text-red-500' : 'text-primary'
                                     }`}
                                 >
                                   {formatCurrency(remainingCents)}
@@ -397,7 +394,7 @@ export function BudgetTracker() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-zinc-900 border border-border p-6 rounded-3xl">
                 <div className="flex justify-between items-center mb-3">
-                  <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest">
+                  <span className="text-zinc-500 text-sm font-bold uppercase tracking-widest">
                     Total Planned
                   </span>
                   <span className="text-white font-bold">
@@ -410,7 +407,7 @@ export function BudgetTracker() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest">
+                  <span className="text-zinc-500 text-sm font-bold uppercase tracking-widest">
                     Spent in {month}
                   </span>
                   <span className="text-red-500 font-bold">
@@ -424,13 +421,13 @@ export function BudgetTracker() {
                 </div>
               </div>
               <div className="bg-zinc-900 border border-border p-6 rounded-3xl flex flex-col justify-center">
-                <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-1 block text-right">
+                <span className="text-zinc-500 text-sm font-bold uppercase tracking-widest mb-1 block text-right">
                   Total Remaining
                 </span>
                 <p className={`text-3xl font-bold text-right tracking-tight ${(Object.values(allocations).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0) -
-                    Object.values(spent).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0)) >= 0
-                    ? 'text-primary'
-                    : 'text-red-500'
+                  Object.values(spent).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0)) >= 0
+                  ? 'text-primary'
+                  : 'text-red-500'
                   }`}>
                   {formatCurrency(
                     Object.values(allocations).reduce(
