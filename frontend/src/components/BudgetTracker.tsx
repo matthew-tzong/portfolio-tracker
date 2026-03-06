@@ -433,7 +433,7 @@ export function BudgetTracker() {
                     Object.values(allocations).reduce(
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
-                    ) +
+                    ) -
                     Object.values(spent).reduce(
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
