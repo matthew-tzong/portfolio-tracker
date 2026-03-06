@@ -424,7 +424,7 @@ export function BudgetTracker() {
                 <span className="text-zinc-500 text-sm font-bold uppercase tracking-widest mb-1 block text-right">
                   Total Remaining
                 </span>
-                <p className={`text-3xl font-bold text-right tracking-tight ${(Object.values(allocations).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0) -
+                <p className={`text-3xl font-bold text-right tracking-tight ${(Object.values(allocations).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0) +
                   Object.values(spent).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0)) >= 0
                   ? 'text-primary'
                   : 'text-red-500'
