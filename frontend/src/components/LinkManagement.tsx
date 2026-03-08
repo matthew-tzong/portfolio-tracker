@@ -248,10 +248,11 @@ export function LinkManagement() {
                         </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`px-3 py-1 rounded-full text-[10px] font-bold border ${item.status === 'OK'
-                              ? 'bg-primary/10 text-primary border-primary/20'
-                              : 'bg-red-500/10 text-red-400 border-red-500/20'
-                              }`}
+                            className={`px-3 py-1 rounded-full text-[10px] font-bold border ${
+                              item.status === 'OK'
+                                ? 'bg-primary/10 text-primary border-primary/20'
+                                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                            }`}
                           >
                             {item.status === 'OK' ? 'CONNECTED' : item.status}
                           </span>
@@ -310,11 +311,12 @@ export function LinkManagement() {
                 <table className="min-w-full text-sm">
                   <tbody className="divide-y divide-border">
                     {data.fidelityItems.map((item) => (
-                      <tr key={item.itemId} className="hover:bg-zinc-800/30 transition-colors group">
+                      <tr
+                        key={item.itemId}
+                        className="hover:bg-zinc-800/30 transition-colors group"
+                      >
                         <td className="px-6 py-4">
-                          <div className="font-bold text-white">
-                            {item.institutionName}
-                          </div>
+                          <div className="font-bold text-white">{item.institutionName}</div>
                           <div className="text-[10px] font-bold text-zinc-500 uppercase tracking-tighter mt-0.5">
                             MANUAL TRACKING
                           </div>

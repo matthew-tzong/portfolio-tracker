@@ -80,7 +80,11 @@ export function CategoryPieChart({ title, data, height = 260 }: CategoryPieChart
             <Legend
               verticalAlign="bottom"
               height={36}
-              formatter={(value) => <span style={{ color: '#d4d4d8', fontSize: '12px', fontWeight: 'bold' }}>{value}</span>}
+              formatter={(value) => (
+                <span style={{ color: '#d4d4d8', fontSize: '12px', fontWeight: 'bold' }}>
+                  {value}
+                </span>
+              )}
             />
           </PieChart>
         </ResponsiveContainer>

@@ -100,7 +100,10 @@ export function Portfolio() {
   const [yearlySummaryLoading, setYearlySummaryLoading] = useState(false)
   const [yearlySummaryError, setYearlySummaryError] = useState<string | null>(null)
 
-  const [uploadMessage, setUploadMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [uploadMessage, setUploadMessage] = useState<{
+    text: string
+    type: 'success' | 'error'
+  } | null>(null)
   const [uploadLoading, setUploadLoading] = useState(false)
 
   // Loads the holdings.
@@ -351,7 +354,10 @@ export function Portfolio() {
     }
   }
 
-  const handleFidelityUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'statement' | 'holdings') => {
+  const handleFidelityUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'statement' | 'holdings',
+  ) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -361,19 +367,22 @@ export function Portfolio() {
     // Uploads the file.
     try {
       const { supabase } = await import('../lib/supabase')
-      const { data: { session } } = await supabase.auth.getSession()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
       const formData = new FormData()
       formData.append('file', file)
 
       const API_URL = import.meta.env.VITE_API_URL || ''
-      const endpoint = type === 'statement' ? '/api/fidelity/upload-statement' : '/api/fidelity/upload-holdings'
+      const endpoint =
+        type === 'statement' ? '/api/fidelity/upload-statement' : '/api/fidelity/upload-holdings'
 
       const response = await fetch(`${API_URL}${endpoint}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session?.access_token}`
+          Authorization: `Bearer ${session?.access_token}`,
         },
-        body: formData
+        body: formData,
       })
 
       // Parses the response.
@@ -387,7 +396,10 @@ export function Portfolio() {
       await loadHoldings()
       await loadSnapshots()
     } catch (err) {
-      setUploadMessage({ text: err instanceof Error ? err.message : 'Upload failed', type: 'error' })
+      setUploadMessage({
+        text: err instanceof Error ? err.message : 'Upload failed',
+        type: 'error',
+      })
     } finally {
       setUploadLoading(false)
       e.target.value = ''
@@ -500,7 +512,9 @@ export function Portfolio() {
                 className={`flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-3xl cursor-pointer hover:border-blue-500/50 hover:bg-blue-500/5 transition-all ${uploadLoading ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <span className="text-white font-bold mb-1">Upload Monthly Statement</span>
-                <span className="text-zinc-500 text-xs text-center font-medium">Format: StatementMMDDYYYY.csv</span>
+                <span className="text-zinc-500 text-xs text-center font-medium">
+                  Format: StatementMMDDYYYY.csv
+                </span>
               </label>
             </div>
 
@@ -518,16 +532,21 @@ export function Portfolio() {
                 className={`flex flex-col items-center justify-center p-6 border-2 border-dashed border-border rounded-3xl cursor-pointer hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all ${uploadLoading ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 <span className="text-white font-bold mb-1">Upload Current Holdings</span>
-                <span className="text-zinc-500 text-xs text-center font-medium">Format: Portfolio_Positions_Mon-DD-YYYY.csv</span>
+                <span className="text-zinc-500 text-xs text-center font-medium">
+                  Format: Portfolio_Positions_Mon-DD-YYYY.csv
+                </span>
               </label>
             </div>
           </div>
 
           {uploadMessage && (
-            <div className={`mt-6 p-4 rounded-2xl text-sm font-bold border ${uploadMessage.type === 'success'
-              ? 'bg-primary/10 text-primary border-primary/20'
-              : 'bg-red-500/10 text-red-500 border-red-500/20'
-              }`}>
+            <div
+              className={`mt-6 p-4 rounded-2xl text-sm font-bold border ${
+                uploadMessage.type === 'success'
+                  ? 'bg-primary/10 text-primary border-primary/20'
+                  : 'bg-red-500/10 text-red-500 border-red-500/20'
+              }`}
+            >
               {uploadMessage.text}
             </div>
           )}
@@ -557,10 +576,11 @@ export function Portfolio() {
                     onClick={() =>
                       setSelected(selected?.type === 'total' ? null : { type: 'total' })
                     }
-                    className={`w-full text-left p-6 rounded-3xl transition-all duration-300 group ${selected?.type === 'total'
-                      ? 'bg-zinc-800 border border-zinc-700'
-                      : 'hover:bg-zinc-800/50 border border-transparent'
-                      }`}
+                    className={`w-full text-left p-6 rounded-3xl transition-all duration-300 group ${
+                      selected?.type === 'total'
+                        ? 'bg-zinc-800 border border-zinc-700'
+                        : 'hover:bg-zinc-800/50 border border-transparent'
+                    }`}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -594,16 +614,17 @@ export function Portfolio() {
                             selected?.type === 'account' && selected.accountId === accountId
                               ? null
                               : {
-                                type: 'account',
-                                accountId,
-                                accountName: accountData.accountName,
-                              },
+                                  type: 'account',
+                                  accountId,
+                                  accountName: accountData.accountName,
+                                },
                           )
                         }
-                        className={`w-full text-left p-5 rounded-3xl border transition-all duration-300 ${selected?.type === 'account' && selected.accountId === accountId
-                          ? 'bg-zinc-800 border-zinc-700'
-                          : 'bg-zinc-900 border-border hover:border-zinc-700 hover:bg-zinc-800/40'
-                          }`}
+                        className={`w-full text-left p-5 rounded-3xl border transition-all duration-300 ${
+                          selected?.type === 'account' && selected.accountId === accountId
+                            ? 'bg-zinc-800 border-zinc-700'
+                            : 'bg-zinc-900 border-border hover:border-zinc-700 hover:bg-zinc-800/40'
+                        }`}
                       >
                         <div className="flex items-center justify-between mb-1">
                           <span className="font-bold text-white truncate mr-2">
@@ -618,42 +639,43 @@ export function Portfolio() {
                       {/* Holdings within account - show mini list only when selected (account or holding within account) */}
                       {((selected?.type === 'account' && selected.accountId === accountId) ||
                         (selected?.type === 'holding' && selected.accountId === accountId)) && (
-                          <div className="space-y-1 mt-1">
-                            {accountData.holdings.map((h, idx) => {
-                              const isSelectedHolding =
-                                selected?.type === 'holding' &&
-                                selected.accountId === h.accountId &&
-                                selected.symbol === h.symbol
+                        <div className="space-y-1 mt-1">
+                          {accountData.holdings.map((h, idx) => {
+                            const isSelectedHolding =
+                              selected?.type === 'holding' &&
+                              selected.accountId === h.accountId &&
+                              selected.symbol === h.symbol
 
-                              return (
-                                <button
-                                  type="button"
-                                  key={`${h.accountId}-${h.symbol}-${idx}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setSelected(
-                                      isSelectedHolding
-                                        ? { type: 'account', accountId, accountName: h.accountName }
-                                        : {
+                            return (
+                              <button
+                                type="button"
+                                key={`${h.accountId}-${h.symbol}-${idx}`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelected(
+                                    isSelectedHolding
+                                      ? { type: 'account', accountId, accountName: h.accountName }
+                                      : {
                                           type: 'holding',
                                           accountId: h.accountId,
                                           accountName: h.accountName,
                                           symbol: h.symbol,
                                         },
-                                    )
-                                  }}
-                                  className={`w-full text-left px-5 py-3 rounded-2xl flex items-center justify-between text-xs font-medium transition-all ${isSelectedHolding
+                                  )
+                                }}
+                                className={`w-full text-left px-5 py-3 rounded-2xl flex items-center justify-between text-xs font-medium transition-all ${
+                                  isSelectedHolding
                                     ? 'bg-primary/10 text-primary border border-primary/20'
                                     : 'hover:bg-zinc-800 text-zinc-400 border border-transparent'
-                                    }`}
-                                >
-                                  <span className="font-bold">{h.symbol}</span>
-                                  <span>{formatCurrency(h.valueCents)}</span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        )}
+                                }`}
+                              >
+                                <span className="font-bold">{h.symbol}</span>
+                                <span>{formatCurrency(h.valueCents)}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -663,139 +685,137 @@ export function Portfolio() {
         </div>
 
         {/* Performance for selected item: Last 30 days + Past 12 months */}
-        {
-          selected !== null && selectedLabel && (
-            <div className="lg:col-span-12 bg-card border border-border rounded-4xl p-8 shadow-2xl">
-              <div className="flex justify-between items-start mb-10">
-                <div>
-                  <h2 className="text-2xl font-bold text-white mb-1">Performance</h2>
-                  <p className="text-zinc-400 font-medium flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-primary" />
-                    {selectedLabel}
-                  </p>
+        {selected !== null && selectedLabel && (
+          <div className="lg:col-span-12 bg-card border border-border rounded-4xl p-8 shadow-2xl">
+            <div className="flex justify-between items-start mb-10">
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-1">Performance</h2>
+                <p className="text-zinc-400 font-medium flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-primary" />
+                  {selectedLabel}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+              {/* Last 30 days (daily) */}
+              <div className="flex flex-col h-[400px]">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">
+                  Last 30 days (daily)
+                </h3>
+                <div className="flex-1 min-h-0">
+                  {selected.type === 'total' && (
+                    <>
+                      {totalDailySeries.length === 0 && !snapshotsLoading ? (
+                        <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
+                          <p className="text-sm text-zinc-600 font-medium">
+                            No daily snapshot data yet.
+                          </p>
+                        </div>
+                      ) : (
+                        <TimeSeriesChart title="" data={totalDailyChartData} />
+                      )}
+                    </>
+                  )}
+                  {selected.type === 'account' && (
+                    <>
+                      {historyLoading ? (
+                        <div className="h-full bg-zinc-800/50 animate-pulse rounded-3xl" />
+                      ) : accountDailySeries.length === 0 ? (
+                        <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
+                          <p className="text-sm text-zinc-600 font-medium">
+                            No daily history for this account yet.
+                          </p>
+                        </div>
+                      ) : (
+                        <TimeSeriesChart
+                          title=""
+                          data={accountDailySeries.map((s) => ({
+                            date: s.date,
+                            value: s.valueCents / 100,
+                          }))}
+                        />
+                      )}
+                    </>
+                  )}
+                  {selected.type === 'holding' && (
+                    <>
+                      {historyLoading ? (
+                        <div className="h-full bg-zinc-800/50 animate-pulse rounded-3xl" />
+                      ) : holdingDailySeries.length === 0 ? (
+                        <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
+                          <p className="text-sm text-zinc-600 font-medium">
+                            No daily history for this holding yet.
+                          </p>
+                        </div>
+                      ) : (
+                        <TimeSeriesChart
+                          title=""
+                          data={holdingDailySeries.map((s) => ({
+                            date: s.date,
+                            value: s.valueCents / 100,
+                          }))}
+                        />
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                {/* Last 30 days (daily) */}
-                <div className="flex flex-col h-[400px]">
-                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">
-                    Last 30 days (daily)
-                  </h3>
-                  <div className="flex-1 min-h-0">
-                    {selected.type === 'total' && (
-                      <>
-                        {totalDailySeries.length === 0 && !snapshotsLoading ? (
-                          <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
-                            <p className="text-sm text-zinc-600 font-medium">
-                              No daily snapshot data yet.
-                            </p>
-                          </div>
-                        ) : (
-                          <TimeSeriesChart title="" data={totalDailyChartData} />
-                        )}
-                      </>
-                    )}
-                    {selected.type === 'account' && (
-                      <>
-                        {historyLoading ? (
-                          <div className="h-full bg-zinc-800/50 animate-pulse rounded-3xl" />
-                        ) : accountDailySeries.length === 0 ? (
-                          <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
-                            <p className="text-sm text-zinc-600 font-medium">
-                              No daily history for this account yet.
-                            </p>
-                          </div>
-                        ) : (
-                          <TimeSeriesChart
-                            title=""
-                            data={accountDailySeries.map((s) => ({
-                              date: s.date,
-                              value: s.valueCents / 100,
-                            }))}
-                          />
-                        )}
-                      </>
-                    )}
-                    {selected.type === 'holding' && (
-                      <>
-                        {historyLoading ? (
-                          <div className="h-full bg-zinc-800/50 animate-pulse rounded-3xl" />
-                        ) : holdingDailySeries.length === 0 ? (
-                          <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
-                            <p className="text-sm text-zinc-600 font-medium">
-                              No daily history for this holding yet.
-                            </p>
-                          </div>
-                        ) : (
-                          <TimeSeriesChart
-                            title=""
-                            data={holdingDailySeries.map((s) => ({
-                              date: s.date,
-                              value: s.valueCents / 100,
-                            }))}
-                          />
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Past 12 months (monthly) */}
-                <div className="flex flex-col h-[400px]">
-                  <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">
-                    Past 12 months (monthly)
-                  </h3>
-                  <div className="flex-1 min-h-0">
-                    {selected.type === 'total' && (
-                      <>
-                        {totalMonthlySeries.length === 0 && !snapshotsLoading ? (
-                          <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
-                            <p className="text-sm text-zinc-600 font-medium">
-                              No monthly snapshot data yet.
-                            </p>
-                          </div>
-                        ) : (
-                          <TimeSeriesChart title="" data={totalMonthlyChartData} isMonthly={true} />
-                        )}
-                      </>
-                    )}
-                    {selected.type === 'account' && (
-                      <>
-                        {accountMonthlyLoading ? (
-                          <div className="h-full bg-zinc-800/50 animate-pulse rounded-3xl" />
-                        ) : accountMonthly.length === 0 ? (
-                          <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
-                            <p className="text-sm text-zinc-600 font-medium">
-                              No monthly history for this account yet.
-                            </p>
-                          </div>
-                        ) : (
-                          <TimeSeriesChart
-                            title=""
-                            data={accountMonthly.slice(-12).map((s) => ({
-                              date: s.date,
-                              value: s.portfolioValueCents / 100,
-                            }))}
-                            isMonthly={true}
-                          />
-                        )}
-                      </>
-                    )}
-                    {selected.type === 'holding' && (
-                      <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl p-10 text-center">
-                        <p className="text-xs text-zinc-500 font-medium">
-                          Monthly performance per holding is not stored; only total portfolio and
-                          per-account monthly history are available.
-                        </p>
-                      </div>
-                    )}
-                  </div>
+              {/* Past 12 months (monthly) */}
+              <div className="flex flex-col h-[400px]">
+                <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-widest mb-6">
+                  Past 12 months (monthly)
+                </h3>
+                <div className="flex-1 min-h-0">
+                  {selected.type === 'total' && (
+                    <>
+                      {totalMonthlySeries.length === 0 && !snapshotsLoading ? (
+                        <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
+                          <p className="text-sm text-zinc-600 font-medium">
+                            No monthly snapshot data yet.
+                          </p>
+                        </div>
+                      ) : (
+                        <TimeSeriesChart title="" data={totalMonthlyChartData} isMonthly={true} />
+                      )}
+                    </>
+                  )}
+                  {selected.type === 'account' && (
+                    <>
+                      {accountMonthlyLoading ? (
+                        <div className="h-full bg-zinc-800/50 animate-pulse rounded-3xl" />
+                      ) : accountMonthly.length === 0 ? (
+                        <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl">
+                          <p className="text-sm text-zinc-600 font-medium">
+                            No monthly history for this account yet.
+                          </p>
+                        </div>
+                      ) : (
+                        <TimeSeriesChart
+                          title=""
+                          data={accountMonthly.slice(-12).map((s) => ({
+                            date: s.date,
+                            value: s.portfolioValueCents / 100,
+                          }))}
+                          isMonthly={true}
+                        />
+                      )}
+                    </>
+                  )}
+                  {selected.type === 'holding' && (
+                    <div className="h-full flex items-center justify-center border border-dashed border-border rounded-3xl p-10 text-center">
+                      <p className="text-xs text-zinc-500 font-medium">
+                        Monthly performance per holding is not stored; only total portfolio and
+                        per-account monthly history are available.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          )
-        }
+          </div>
+        )}
 
         {/* Yearly portfolio summary by account (end-of-year value) */}
         <div className="lg:col-span-12 bg-card border border-border rounded-4xl p-8 shadow-2xl">
@@ -887,7 +907,7 @@ export function Portfolio() {
             </div>
           ) : null}
         </div>
-      </div >
-    </div >
+      </div>
+    </div>
   )
 }

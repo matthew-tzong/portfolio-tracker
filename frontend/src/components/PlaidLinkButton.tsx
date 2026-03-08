@@ -8,7 +8,10 @@ interface PlaidLinkButtonProps {
 }
 
 // Button that opens Plaid Link using the browser script.
-export function PlaidLinkButton({ onLinked, products = ['transactions', 'investments'] }: PlaidLinkButtonProps) {
+export function PlaidLinkButton({
+  onLinked,
+  products = ['transactions', 'investments'],
+}: PlaidLinkButtonProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -24,7 +27,9 @@ export function PlaidLinkButton({ onLinked, products = ['transactions', 'investm
 
       // Fetches the link token from the Go backend to add Plaid Link to the page.
       const productsQuery = products.length > 0 ? `?products=${products.join(',')}` : ''
-      const { linkToken } = await apiRequest<{ linkToken: string }>(`/api/plaid/link-token${productsQuery}`)
+      const { linkToken } = await apiRequest<{ linkToken: string }>(
+        `/api/plaid/link-token${productsQuery}`,
+      )
 
       const handler = window.Plaid.create({
         token: linkToken,

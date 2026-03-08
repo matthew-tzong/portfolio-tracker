@@ -41,14 +41,14 @@ function formatDateLabel(dateStr: string, isMonthly?: boolean): string {
   if (isMonthly) {
     return date.toLocaleDateString('en-US', {
       month: 'long',
-      year: 'numeric'
+      year: 'numeric',
     })
   }
 
   return date.toLocaleDateString('en-US', {
     month: 'short',
     day: 'numeric',
-    year: 'numeric'
+    year: 'numeric',
   })
 }
 

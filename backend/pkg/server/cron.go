@@ -131,7 +131,7 @@ func writeInvestmentSnapshotsForDate(r *http.Request, deps apiDependencies, date
 	if err != nil {
 		return false, err
 	}
- 
+
 	// Calculate date for snapshots.
 	today := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, GetLocalLocation())
 

@@ -340,7 +340,9 @@ export function BudgetTracker() {
                             key={category.id}
                             className="hover:bg-zinc-800/30 transition-colors group"
                           >
-                            <td className="px-6 py-4 font-bold text-white text-sm">{category.name}</td>
+                            <td className="px-6 py-4 font-bold text-white text-sm">
+                              {category.name}
+                            </td>
                             <td className="px-6 py-4 text-right text-sm">
                               <div className="flex justify-end items-center">
                                 <span className="text-zinc-500 mr-2 text-sm font-bold">$</span>
@@ -375,8 +377,9 @@ export function BudgetTracker() {
                                 </span>
                               ) : (
                                 <span
-                                  className={`font-bold text-sm ${remainingCents < 0 ? 'text-red-500' : 'text-primary'
-                                    }`}
+                                  className={`font-bold text-sm ${
+                                    remainingCents < 0 ? 'text-red-500' : 'text-primary'
+                                  }`}
                                 >
                                   {formatCurrency(remainingCents)}
                                 </span>
@@ -424,20 +427,30 @@ export function BudgetTracker() {
                 <span className="text-zinc-500 text-sm font-bold uppercase tracking-widest mb-1 block text-right">
                   Total Remaining
                 </span>
-                <p className={`text-3xl font-bold text-right tracking-tight ${(Object.values(allocations).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0) +
-                  Object.values(spent).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0)) >= 0
-                  ? 'text-primary'
-                  : 'text-red-500'
-                  }`}>
+                <p
+                  className={`text-3xl font-bold text-right tracking-tight ${
+                    Object.values(allocations).reduce(
+                      (sum, v) => sum + (typeof v === 'number' ? v : 0),
+                      0,
+                    ) +
+                      Object.values(spent).reduce(
+                        (sum, v) => sum + (typeof v === 'number' ? v : 0),
+                        0,
+                      ) >=
+                    0
+                      ? 'text-primary'
+                      : 'text-red-500'
+                  }`}
+                >
                   {formatCurrency(
                     Object.values(allocations).reduce(
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
-                    ) -
-                    Object.values(spent).reduce(
-                      (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                      0,
-                    ),
+                    ) +
+                      Object.values(spent).reduce(
+                        (sum, value) => sum + (typeof value === 'number' ? value : 0),
+                        0,
+                      ),
                   )}
                 </p>
               </div>

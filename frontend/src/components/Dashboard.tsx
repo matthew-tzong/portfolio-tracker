@@ -109,8 +109,11 @@ export function Dashboard() {
         {accountsLoading ? (
           <div className="h-12 w-48 bg-zinc-800 animate-pulse rounded-lg mb-8" />
         ) : (
-          <p className={`text-5xl font-bold mb-10 tracking-tighter ${(accountsData?.netWorthCents ?? 0) >= 0 ? 'text-white' : 'text-red-500'
-            }`}>
+          <p
+            className={`text-5xl font-bold mb-10 tracking-tighter ${
+              (accountsData?.netWorthCents ?? 0) >= 0 ? 'text-white' : 'text-red-500'
+            }`}
+          >
             {accountsData ? formatCurrency(accountsData.netWorthCents) : '$0.00'}
           </p>
         )}
@@ -127,7 +130,9 @@ export function Dashboard() {
               <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
                 Cash Assets
               </p>
-              <p className={`text-xl font-bold ${(accountsData.cashCents >= 0) ? 'text-green-500' : 'text-red-500'}`}>
+              <p
+                className={`text-xl font-bold ${accountsData.cashCents >= 0 ? 'text-green-500' : 'text-red-500'}`}
+              >
                 {formatCurrency(accountsData.cashCents)}
               </p>
             </div>
@@ -135,7 +140,9 @@ export function Dashboard() {
               <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-1">
                 Investments
               </p>
-              <p className={`text-xl font-bold ${(accountsData.investmentsCents >= 0) ? 'text-green-500' : 'text-red-500'}`}>
+              <p
+                className={`text-xl font-bold ${accountsData.investmentsCents >= 0 ? 'text-green-500' : 'text-red-500'}`}
+              >
                 {formatCurrency(accountsData.investmentsCents)}
               </p>
             </div>

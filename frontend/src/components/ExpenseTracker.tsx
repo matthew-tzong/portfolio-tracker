@@ -358,9 +358,14 @@ export function ExpenseTracker() {
                   <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2 block">
                     Net Savings
                   </span>
-                  <p className={`text-2xl font-bold tracking-tight ${(summary.incomeCents + summary.expensesCents) >= 0 ? 'text-green-500' : 'text-red-500'
-                    }`}>
-                    {formatCurrency(summary.incomeCents + summary.expensesCents)}
+                  <p
+                    className={`text-2xl font-bold tracking-tight ${
+                      summary.incomeCents - summary.expensesCents >= 0
+                        ? 'text-green-500'
+                        : 'text-red-500'
+                    }`}
+                  >
+                    {formatCurrency(summary.incomeCents - summary.expensesCents)}
                   </p>
                 </div>
               </>
@@ -444,12 +449,11 @@ export function ExpenseTracker() {
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-xs">
                       {(() => {
-                        const isCredit = tx.accountType === 'credit'
-                        const displayAmount = isCredit ? -tx.amountCents : tx.amountCents
+                        const displayAmount = tx.amountCents
                         const isNegative = displayAmount < 0
                         return (
                           <span className={isNegative ? 'text-red-500' : 'text-green-500'}>
-                            {isNegative ? '-' : '+'}{formatCurrency(Math.abs(displayAmount))}
+                            {formatCurrency(displayAmount)}
                           </span>
                         )
                       })()}
@@ -529,7 +533,7 @@ export function ExpenseTracker() {
                       {formatCurrency(row.totalCents)}
                     </td>
                     <td className="px-6 py-4 text-right text-zinc-400 font-medium">
-                      {row.transactionCount} txns
+                      {row.transactionCount}
                     </td>
                   </tr>
                 ))}
