@@ -48,6 +48,10 @@ func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencie
 		return
 	}
 
+	// Calculate target date (yesterday).
+	now := GetLocalNow()
+	targetDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, GetLocalLocation()).AddDate(0, 0, -1)
+
 	// Update connection statuses for Plaid.
 	_ = checkAndUpdatePlaidItemStatuses(r.Context(), deps.db, deps.plaidClient)
 
@@ -63,8 +67,8 @@ func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencie
 		return
 	}
 
-	// Fetch Plaid investment holdings/balances and write today's snapshots.
-	dailyWritten, err := writeInvestmentSnapshotsForToday(r, deps)
+	// Fetch Plaid investment holdings/balances and write snapshots for the target date.
+	dailyWritten, err := writeInvestmentSnapshotsForDate(r, deps, targetDate)
 	if err != nil {
 		writeJSONError(w, http.StatusInternalServerError, "Investment snapshot failed: "+err.Error())
 		return
@@ -80,7 +84,7 @@ func handleDailySync(w http.ResponseWriter, r *http.Request, deps apiDependencie
 	*/
 
 	// Run retention job to prune old data.
-	_ = runRetentionJob(r.Context(), deps)
+	_ = runRetentionJob(r.Context(), deps, targetDate)
 
 	// Returns the response.
 	resp := cronSyncResponse{
@@ -116,8 +120,8 @@ func runPlaidSafetySync(r *http.Request, deps apiDependencies) (int, error) {
 	return len(items), nil
 }
 
-// Adds today's Plaid daily holdings/snapshots along with end of month monthly snapshots.
-func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bool, error) {
+// Adds daily Plaid holdings/snapshots for a given date along with end of month monthly snapshots.
+func writeInvestmentSnapshotsForDate(r *http.Request, deps apiDependencies, date time.Time) (bool, error) {
 	if deps.db == nil || deps.plaidClient == nil {
 		return false, nil
 	}
@@ -127,10 +131,9 @@ func writeInvestmentSnapshotsForToday(r *http.Request, deps apiDependencies) (bo
 	if err != nil {
 		return false, err
 	}
-
-	// Sets the current time as the snapshot date.
-	now := GetLocalNow()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, GetLocalLocation())
+ 
+	// Calculate date for snapshots.
+	today := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, GetLocalLocation())
 
 	for _, item := range items {
 		if item.AccessToken == "manual" {
@@ -365,13 +368,12 @@ func maybeWriteMonthlyNetWorth(r *http.Request, deps apiDependencies, date time.
 }
 
 // Runs retention job to prune old data according to retention rules.
-func runRetentionJob(ctx context.Context, deps apiDependencies) error {
+func runRetentionJob(ctx context.Context, deps apiDependencies, date time.Time) error {
 	if deps.db == nil {
 		return nil
 	}
 
-	now := GetLocalNow()
-	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, GetLocalLocation())
+	today := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, GetLocalLocation())
 	userEmail := os.Getenv("ALLOWED_USER_EMAIL")
 
 	// Prunes 1 year old transactions on the first day of each month.
@@ -432,11 +434,11 @@ func runRetentionJob(ctx context.Context, deps apiDependencies) error {
 	_ = deps.db.DeleteDailyHoldingsOlderThan(ctx, thirtyDaysAgo)
 
 	// Prunes yearly monthly snapshots on December 31.
-	if now.Month() != 12 || now.Day() != 31 {
+	if today.Month() != 12 || today.Day() != 31 {
 		return nil
 	}
 
-	lastYear := now.Year() - 1
+	lastYear := today.Year()
 	snapshots, err := deps.db.ListMonthlySnapshotsForYear(ctx, lastYear)
 	// Creates yearly summaries and deletes the monthly snapshots.
 	if err != nil || len(snapshots) == 0 {
