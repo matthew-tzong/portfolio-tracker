@@ -214,15 +214,20 @@ export function ExpenseTracker() {
     const totalsByCategory: Record<string, number> = {}
     transactions.forEach((transaction) => {
       const categoryName = transaction.categoryName || 'Uncategorized'
-      if (categoryName === 'Transfer') {
+      // Exclude transfers and investments from the expense breakdown pie chart.
+      if (categoryName === 'Transfer' || categoryName === 'Investments') {
         return
       }
-      const delta = transaction.amountCents
-      totalsByCategory[categoryName] = (totalsByCategory[categoryName] ?? 0) + delta
+      // Sum only the outflows (negative cents) to show a gross expense breakdown.
+      // This ensures categories like Venmo show up even if they have more inflows than outflows overall.
+      if (transaction.amountCents < 0) {
+        const delta = Math.abs(transaction.amountCents)
+        totalsByCategory[categoryName] = (totalsByCategory[categoryName] ?? 0) + delta
+      }
     })
     return Object.entries(totalsByCategory).map(([name, valueCents]) => ({
       name,
-      value: Math.max(-valueCents, 0) / 100,
+      value: valueCents / 100,
     }))
   }, [transactions])
 
@@ -331,9 +336,9 @@ export function ExpenseTracker() {
 
         {/* Monthly summary cards */}
         {month && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-10">
             {summaryLoading ? (
-              Array.from({ length: 3 }).map((_, i) => (
+              Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="h-24 bg-zinc-800 animate-pulse rounded-3xl" />
               ))
             ) : summary ? (
@@ -354,23 +359,32 @@ export function ExpenseTracker() {
                     {formatCurrency(summary.expensesCents)}
                   </p>
                 </div>
+                <div className="bg-zinc-900 border border-border p-6 rounded-3xl group hover:border-blue-500/30 transition-all">
+                  <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2 block">
+                    Investments
+                  </span>
+                  <p className="text-2xl font-bold text-blue-500 tracking-tight">
+                    {formatCurrency(summary.investedCents)}
+                  </p>
+                </div>
                 <div className="bg-zinc-900 border border-border p-6 rounded-3xl group hover:border-primary/30 transition-all">
                   <span className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2 block">
                     Net Savings
                   </span>
                   <p
-                    className={`text-2xl font-bold tracking-tight ${
-                      summary.incomeCents - summary.expensesCents >= 0
-                        ? 'text-green-500'
-                        : 'text-red-500'
-                    }`}
+                    className={`text-2xl font-bold tracking-tight ${summary.incomeCents - summary.expensesCents - summary.investedCents >= 0
+                      ? 'text-green-500'
+                      : 'text-red-500'
+                      }`}
                   >
-                    {formatCurrency(summary.incomeCents - summary.expensesCents)}
+                    {formatCurrency(
+                      summary.incomeCents - summary.expensesCents - summary.investedCents,
+                    )}
                   </p>
                 </div>
               </>
             ) : (
-              <div className="col-span-3 p-6 bg-zinc-900 border border-dashed border-border rounded-3xl text-center">
+              <div className="col-span-4 p-6 bg-zinc-900 border border-dashed border-border rounded-3xl text-center">
                 <p className="text-sm text-zinc-500 font-medium italic">
                   No summary for this month.
                 </p>

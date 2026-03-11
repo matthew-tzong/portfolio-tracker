@@ -333,7 +333,7 @@ export function BudgetTracker() {
                         const key = String(category.id)
                         const allocatedCents = allocations[key] ?? 0
                         const spentCents = spent[key] ?? 0
-                        const remainingCents = allocatedCents - Math.abs(spentCents)
+                        const remainingCents = allocatedCents + spentCents
 
                         return (
                           <tr
@@ -365,7 +365,10 @@ export function BudgetTracker() {
                               {spentCents === 0 ? (
                                 <span className="text-zinc-600 font-bold">—</span>
                               ) : (
-                                <span className="font-bold text-sm text-red-500">
+                                <span
+                                  className={`font-bold text-sm ${spentCents > 0 ? 'text-green-500' : 'text-red-500'
+                                    }`}
+                                >
                                   {formatCurrency(spentCents)}
                                 </span>
                               )}
@@ -377,9 +380,8 @@ export function BudgetTracker() {
                                 </span>
                               ) : (
                                 <span
-                                  className={`font-bold text-sm ${
-                                    remainingCents < 0 ? 'text-red-500' : 'text-primary'
-                                  }`}
+                                  className={`font-bold text-sm ${remainingCents < 0 ? 'text-red-500' : 'text-primary'
+                                    }`}
                                 >
                                   {formatCurrency(remainingCents)}
                                 </span>
@@ -428,29 +430,28 @@ export function BudgetTracker() {
                   Total Remaining
                 </span>
                 <p
-                  className={`text-3xl font-bold text-right tracking-tight ${
-                    Object.values(allocations).reduce(
-                      (sum, v) => sum + (typeof v === 'number' ? v : 0),
-                      0,
-                    ) +
+                  className={`text-3xl font-bold text-right tracking-tight ${Object.values(allocations).reduce(
+                    (sum, v) => sum + (typeof v === 'number' ? v : 0),
+                    0,
+                  ) +
                       Object.values(spent).reduce(
                         (sum, v) => sum + (typeof v === 'number' ? v : 0),
                         0,
                       ) >=
-                    0
+                      0
                       ? 'text-primary'
                       : 'text-red-500'
-                  }`}
+                    }`}
                 >
                   {formatCurrency(
                     Object.values(allocations).reduce(
                       (sum, value) => sum + (typeof value === 'number' ? value : 0),
                       0,
                     ) +
-                      Object.values(spent).reduce(
-                        (sum, value) => sum + (typeof value === 'number' ? value : 0),
-                        0,
-                      ),
+                    Object.values(spent).reduce(
+                      (sum, value) => sum + (typeof value === 'number' ? value : 0),
+                      0,
+                    ),
                   )}
                 </p>
               </div>
