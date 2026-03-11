@@ -299,10 +299,16 @@ func handleGetTransactionsSummary(w http.ResponseWriter, r *http.Request, deps a
 	// Tracks expenses (spend/refund), investments, and income.
 	var incomeCents, expensesCents, investedCents int64
 	for _, transaction := range list {
+		amountCents := transaction.AmountCents
+		// Transfer category: positive = income, negative = expense
 		if transaction.CategoryID != nil && *transaction.CategoryID == transferCategoryID {
+			if amountCents > 0 {
+				incomeCents += amountCents
+			} else {
+				expensesCents += -amountCents
+			}
 			continue
 		}
-		amountCents := transaction.AmountCents
 		// Expense category: negative = spend, positive = refund
 		if transaction.CategoryID != nil && expenseCategoryIDs[*transaction.CategoryID] {
 			expensesCents += -amountCents
@@ -312,7 +318,7 @@ func handleGetTransactionsSummary(w http.ResponseWriter, r *http.Request, deps a
 			investedCents += -amountCents
 			continue
 		}
-		// Income or uncategorized: positive = income, negative = expense
+		// Default: positive = income, negative = expense
 		if amountCents > 0 {
 			incomeCents += amountCents
 		} else {
