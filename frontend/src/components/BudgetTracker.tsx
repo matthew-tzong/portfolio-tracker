@@ -139,7 +139,7 @@ export function BudgetTracker() {
         return {
           name: category.name,
           budget: allocatedCents / 100,
-          spent: Math.abs(spentCents) / 100,
+          spent: spentCents < 0 ? Math.abs(spentCents) / 100 : 0,
         }
       })
   }, [allocations, categories, spent])
