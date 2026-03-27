@@ -117,7 +117,9 @@ export function ExpenseTracker() {
       const res = await apiRequest<TransactionsResponse>(
         `/api/transactions${query ? `?${query}` : ''}`,
       )
-      setTransactions(res.transactions ?? [])
+      // Hide CC payments from UI (since already calculated as expense)
+      const filtered = (res.transactions ?? []).filter(tx => tx.categoryName !== 'Credit Card Payments')
+      setTransactions(filtered)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load transactions')
       setTransactions([])
